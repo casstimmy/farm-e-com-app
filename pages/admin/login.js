@@ -76,7 +76,7 @@ export default function AdminLogin() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email
@@ -86,6 +86,7 @@ export default function AdminLogin() {
                 <input
                   type="email"
                   name="email"
+                  autoComplete="email"
                   value={form.email}
                   onChange={handleChange}
                   required
@@ -104,6 +105,7 @@ export default function AdminLogin() {
                 <input
                   type="password"
                   name="password"
+                  autoComplete="current-password"
                   value={form.password}
                   onChange={handleChange}
                   required

@@ -6,6 +6,7 @@ import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
 import InventoryCard from "@/components/store/InventoryCard";
 import ServiceCard from "@/components/store/ServiceCard";
+import { useStore } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/formatting";
 import { fetchHomepageData } from "@/lib/homepageData";
 import {
@@ -47,13 +48,30 @@ export async function getStaticProps() {
 
 export default function HomePage({ initialData }) {
   const router = useRouter();
+  const { addToCart, isAuthenticated } = useStore();
   const [data] = useState(initialData);
   const [searchQuery, setSearchQuery] = useState("");
+  const [notice, setNotice] = useState("");
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/animals?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const handleHomeAddToCart = async (item) => {
+    if (!isAuthenticated) {
+      router.push(`/auth/login?redirect=${encodeURIComponent("/")}`);
+      return;
+    }
+    try {
+      await addToCart(null, 1, item._id);
+      setNotice(`${item.item} added to cart`);
+      setTimeout(() => setNotice(""), 2200);
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Failed to add to cart");
+      setTimeout(() => setNotice(""), 2600);
     }
   };
 
@@ -75,6 +93,11 @@ export default function HomePage({ initialData }) {
 
   return (
     <StoreLayout>
+      {notice && (
+        <div className="fixed top-20 right-4 z-50 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium">
+          {notice}
+        </div>
+      )}
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-green-800 via-green-700 to-emerald-600 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -117,7 +140,7 @@ export default function HomePage({ initialData }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search animals, products, services..."
-                  className="w-full pl-11 pr-4 py-4 rounded-l-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+                  className="w-full pl-11 pr-4 py-4 rounded-l-xl bg-white text-gray-900 placeholder:text-gray-500 border border-white/70 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
                 />
               </div>
               <button
@@ -307,7 +330,10 @@ export default function HomePage({ initialData }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <InventoryCard item={item} />
+                <InventoryCard
+                  item={item}
+                  onAddToCart={handleHomeAddToCart}
+                />
               </motion.div>
             ))}
           </div>

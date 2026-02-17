@@ -28,14 +28,13 @@ StoreCategorySchema.index({ slug: 1 }, { unique: true });
 StoreCategorySchema.index({ parent: 1 });
 StoreCategorySchema.index({ isActive: 1, sortOrder: 1 });
 
-StoreCategorySchema.pre("validate", function (next) {
+StoreCategorySchema.pre("validate", function () {
   if (this.isModified("name") && !this.slug) {
     this.slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
   }
-  next();
 });
 
 export default mongoose.models.StoreCategory ||

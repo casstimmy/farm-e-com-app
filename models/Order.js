@@ -121,7 +121,7 @@ OrderSchema.index({ paymentStatus: 1 });
 OrderSchema.index({ customerEmail: 1 });
 
 // Generate order number before saving
-OrderSchema.pre("validate", async function (next) {
+OrderSchema.pre("validate", async function () {
   if (this.isNew && !this.orderNumber) {
     const datePart = new Date()
       .toISOString()
@@ -133,11 +133,10 @@ OrderSchema.pre("validate", async function (next) {
       .toUpperCase();
     this.orderNumber = `ORD-${datePart}-${randomPart}`;
   }
-  next();
 });
 
 // Track status changes
-OrderSchema.pre("save", function (next) {
+OrderSchema.pre("save", function () {
   if (this.isModified("status")) {
     this.statusHistory.push({
       status: this.status,
@@ -157,7 +156,6 @@ OrderSchema.pre("save", function (next) {
       this.cancelledAt = new Date();
     }
   }
-  next();
 });
 
 export default mongoose.models.Order ||
