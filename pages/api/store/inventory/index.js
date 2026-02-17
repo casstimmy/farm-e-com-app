@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
 import InventoryCategory from "@/models/InventoryCategory";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Public Inventory Products API
@@ -9,7 +10,7 @@ import InventoryCategory from "@/models/InventoryCategory";
  * Lists inventory items marked as showOnSite with quantity > 0.
  * Supports category filtering, search, sorting.
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -114,3 +115,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to fetch inventory products" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-inventory-list",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 180,
+  },
+  handler
+);

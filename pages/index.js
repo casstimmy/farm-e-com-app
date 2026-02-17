@@ -6,68 +6,42 @@ import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
 import InventoryCard from "@/components/store/InventoryCard";
 import ServiceCard from "@/components/store/ServiceCard";
-import ProductCard from "@/components/store/ProductCard";
-import { useStore } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/formatting";
-import dbConnect from "@/lib/mongodb";
-import Animal from "@/models/Animal";
-import Inventory from "@/models/Inventory";
-import Service from "@/models/Service";
+import { fetchHomepageData } from "@/lib/homepageData";
 import {
   FaPaw,
   FaBoxOpen,
   FaConciergeBell,
   FaArrowRight,
-  FaSpinner,
-  FaLeaf,
   FaShieldAlt,
   FaTruck,
   FaCheckCircle,
   FaSearch,
 } from "react-icons/fa";
 
-export async function getServerSideProps() {
+export async function getStaticProps() {
   try {
-    await dbConnect();
-    const [animals, inventoryItems, services, animalStats] = await Promise.all([
-      Animal.find({ status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } })
-        .sort({ createdAt: -1 }).limit(6)
-        .populate("location", "name")
-        .select("tagId name species breed gender currentWeight projectedSalesPrice images location dob")
-        .lean(),
-      Inventory.find({ showOnSite: true, quantity: { $gt: 0 } })
-        .sort({ createdAt: -1 }).limit(6)
-        .select("item salesPrice price quantity unit categoryName").lean(),
-      Service.find({ showOnSite: true, isActive: true })
-        .sort({ createdAt: -1 }).limit(6).lean(),
-      Animal.aggregate([
-        { $match: { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } } },
-        { $group: { _id: "$species", count: { $sum: 1 }, avgPrice: { $avg: "$projectedSalesPrice" }, sample: { $first: "$images" } } },
-        { $sort: { count: -1 } },
-      ]),
-    ]);
-    const [totalAnimals, totalProducts, totalServices] = await Promise.all([
-      Animal.countDocuments({ status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } }),
-      Inventory.countDocuments({ showOnSite: true, quantity: { $gt: 0 } }),
-      Service.countDocuments({ showOnSite: true, isActive: true }),
-    ]);
+    const featuredData = await fetchHomepageData();
     return {
       props: {
-        initialData: JSON.parse(JSON.stringify({
-          animals,
-          inventoryItems,
-          services,
-          animalCategories: animalStats.map((s) => ({
-            species: s._id, count: s.count, avgPrice: Math.round(s.avgPrice),
-            image: s.sample?.[0]?.thumb || s.sample?.[0]?.full || null,
-          })),
-          totals: { animals: totalAnimals, products: totalProducts, services: totalServices },
-        })),
+        initialData: JSON.parse(JSON.stringify(featuredData)),
       },
+      revalidate: 30,
     };
   } catch (error) {
-    console.error("Homepage SSR error:", error);
-    return { props: { initialData: null } };
+    console.error("Homepage static data error:", error);
+    return {
+      props: {
+        initialData: {
+          animals: [],
+          inventoryItems: [],
+          services: [],
+          animalCategories: [],
+          totals: { animals: 0, products: 0, services: 0 },
+        },
+      },
+      revalidate: 15,
+    };
   }
 }
 
@@ -433,7 +407,7 @@ export default function HomePage({ initialData }) {
                 Quality Guaranteed
               </h3>
               <p className="text-sm text-gray-500">
-                Backed by our farm's reputation and quality standards
+                Backed by our farm&apos;s reputation and quality standards
               </p>
             </div>
           </div>

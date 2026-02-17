@@ -2,6 +2,10 @@ import jwt from "jsonwebtoken";
 
 const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET;
 
+if (!ADMIN_JWT_SECRET) {
+  throw new Error("Missing ADMIN_JWT_SECRET or JWT_SECRET environment variable");
+}
+
 /**
  * Generate an admin token for Web_Place admin dashboard.
  * Called after verifying credentials via farm-health-app.

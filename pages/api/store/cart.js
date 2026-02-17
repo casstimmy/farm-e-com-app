@@ -3,6 +3,7 @@ import Cart from "@/models/Cart";
 import Product from "@/models/Product";
 import Inventory from "@/models/Inventory";
 import { withCustomerAuth } from "@/utils/customerAuth";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Find or auto-create a Product for an inventory item.
@@ -271,4 +272,11 @@ async function handler(req, res) {
   }
 }
 
-export default withCustomerAuth(handler);
+export default withRateLimit(
+  {
+    keyPrefix: "store-cart",
+    windowMs: 60 * 1000,
+    max: 180,
+  },
+  withCustomerAuth(handler)
+);

@@ -3,6 +3,7 @@ import {
   handlePaystackWebhook,
   verifyWebhookSignature,
 } from "@/services/paymentService";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Paystack webhook endpoint.
@@ -23,7 +24,7 @@ function getRawBody(req) {
   });
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -47,3 +48,13 @@ export default async function handler(req, res) {
     res.status(200).json({ received: true, error: "Processing error" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-payment-webhook",
+    methods: ["POST"],
+    windowMs: 60 * 1000,
+    max: 180,
+  },
+  handler
+);

@@ -1,12 +1,13 @@
 import dbConnect from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { verifyPayment } from "@/services/paymentService";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Payment verification endpoint.
  * GET /api/store/payment/verify?reference=xxx
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -54,3 +55,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Payment verification failed" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-payment-verify",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 100,
+  },
+  handler
+);

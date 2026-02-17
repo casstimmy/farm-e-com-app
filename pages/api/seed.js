@@ -16,9 +16,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Simple security check
+  if (process.env.NODE_ENV === "production") {
+    return res.status(403).json({ error: "Seeding is disabled in production" });
+  }
+
+  const seedToken = process.env.SEED_API_TOKEN;
+  if (!seedToken) {
+    return res.status(500).json({ error: "SEED_API_TOKEN is not configured" });
+  }
+
+  // Security check
   const token = req.headers["x-seed-token"];
-  if (token !== "seed-development-only-2026") {
+  if (token !== seedToken) {
     return res.status(401).json({ error: "Unauthorized - invalid seed token" });
   }
 

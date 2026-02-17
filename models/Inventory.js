@@ -42,6 +42,8 @@ const InventorySchema = new mongoose.Schema(
 
 InventorySchema.index({ categoryId: 1 });
 InventorySchema.index({ item: 1 });
+InventorySchema.index({ showOnSite: 1, quantity: 1, createdAt: -1 });
+InventorySchema.index({ showOnSite: 1, categoryId: 1, quantity: 1 });
 
 export default mongoose.models.Inventory ||
   mongoose.model("Inventory", InventorySchema);

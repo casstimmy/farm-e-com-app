@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Animal from "@/models/Animal";
 import Location from "@/models/Location";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Public Animals API
@@ -10,7 +11,7 @@ import Location from "@/models/Location";
  * Supports filtering by species, breed, gender, location, weight range.
  * Supports sorting by price, weight, age, name.
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -176,3 +177,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to fetch animals" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-animals-list",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 180,
+  },
+  handler
+);

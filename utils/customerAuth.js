@@ -1,7 +1,11 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "ecommerce-web-place-jwt-secret";
+const JWT_SECRET = process.env.JWT_SECRET;
 const CUSTOMER_TOKEN_PREFIX = "customer";
+
+if (!JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET environment variable");
+}
 
 /**
  * Generate a JWT token for a customer.

@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Service from "@/models/Service";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Single Service Detail API
  * GET /api/store/services/[id]
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -51,3 +52,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to fetch service details" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-services-detail",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 240,
+  },
+  handler
+);

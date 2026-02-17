@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/mongodb";
 import BusinessSettings from "@/models/BusinessSettings";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Public Business Settings API
@@ -8,7 +9,7 @@ import BusinessSettings from "@/models/BusinessSettings";
  * Returns public-facing business information (name, logo, contact).
  * No auth required — used by store layout.
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -37,3 +38,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to fetch settings" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-settings",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 300,
+  },
+  handler
+);

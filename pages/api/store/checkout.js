@@ -6,6 +6,7 @@ import {
   createOrder,
 } from "@/services/orderService";
 import { initializePayment } from "@/services/paymentService";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Checkout endpoint.
@@ -97,4 +98,12 @@ async function handler(req, res) {
   }
 }
 
-export default withCustomerAuth(handler);
+export default withRateLimit(
+  {
+    keyPrefix: "store-checkout",
+    methods: ["POST"],
+    windowMs: 60 * 1000,
+    max: 20,
+  },
+  withCustomerAuth(handler)
+);

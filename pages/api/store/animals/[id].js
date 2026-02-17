@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Animal from "@/models/Animal";
 import Location from "@/models/Location";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Single Animal Detail API
@@ -10,7 +11,7 @@ import Location from "@/models/Location";
  * Returns detailed information about a single animal.
  * Also returns related animals (same species/breed).
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -74,3 +75,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to fetch animal details" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-animals-detail",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 240,
+  },
+  handler
+);

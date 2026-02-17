@@ -2,6 +2,7 @@ import dbConnect from "@/lib/mongodb";
 import Customer from "@/models/Customer";
 import bcrypt from "bcryptjs";
 import { withCustomerAuth } from "@/utils/customerAuth";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Customer account management endpoint.
@@ -84,4 +85,11 @@ async function handler(req, res) {
   }
 }
 
-export default withCustomerAuth(handler);
+export default withRateLimit(
+  {
+    keyPrefix: "store-account",
+    windowMs: 60 * 1000,
+    max: 90,
+  },
+  withCustomerAuth(handler)
+);

@@ -1,11 +1,12 @@
 import dbConnect from "@/lib/mongodb";
 import Product from "@/models/Product";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Public product detail endpoint.
  * GET /api/store/products/[slug]
  */
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -45,3 +46,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to fetch product" });
   }
 }
+
+export default withRateLimit(
+  {
+    keyPrefix: "store-products-detail",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 240,
+  },
+  handler
+);

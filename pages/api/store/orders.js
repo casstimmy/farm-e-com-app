@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { withCustomerAuth } from "@/utils/customerAuth";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Customer order endpoints.
@@ -60,4 +61,12 @@ async function handler(req, res) {
   }
 }
 
-export default withCustomerAuth(handler);
+export default withRateLimit(
+  {
+    keyPrefix: "store-orders",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 120,
+  },
+  withCustomerAuth(handler)
+);
