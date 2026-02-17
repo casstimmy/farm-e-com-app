@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import StoreLayout from "@/components/store/StoreLayout";
@@ -14,11 +14,23 @@ export default function StoreLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Redirect if already logged in
-  if (isAuthenticated && typeof window !== "undefined") {
-    router.replace(redirect || "/");
-    return null;
-  }
+  const redirectTarget = useMemo(() => {
+    const raw = Array.isArray(redirect) ? redirect[0] : redirect;
+    if (!raw) return "/";
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }, [redirect]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(redirectTarget);
+    }
+  }, [isAuthenticated, redirectTarget, router]);
+
+  if (isAuthenticated) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +39,7 @@ export default function StoreLoginPage() {
 
     try {
       await login(email, password);
-      router.push(redirect || "/");
+      await router.push(redirectTarget);
     } catch (err) {
       setError(err.response?.data?.error || "Invalid email or password");
       setLoading(false);

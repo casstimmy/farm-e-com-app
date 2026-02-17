@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
 import StoreLayout from "@/components/store/StoreLayout";
@@ -36,22 +36,20 @@ export default function AccountPage() {
     confirmPassword: "",
   });
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/auth/login?redirect=/account");
-      return;
-    }
-    if (isAuthenticated) fetchProfile();
-  }, [isAuthenticated, authLoading]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const headers = getAuthHeaders();
       const [profileRes, ordersRes] = await Promise.all([
         axios.get("/api/store/account", { headers }),
         axios.get("/api/store/orders?limit=50", { headers }).catch(() => ({ data: { orders: [] } })),
       ]);
-      setProfile(profileRes.data.customer);
+      const profileData = profileRes.data?.customer || profileRes.data;
+      setProfile(profileData);
+      if (profileData) {
+        const existing = JSON.parse(localStorage.getItem("storeCustomer") || "{}");
+        const merged = { ...existing, ...profileData };
+        localStorage.setItem("storeCustomer", JSON.stringify(merged));
+      }
       
       // Build dashboard data from orders
       const orders = ordersRes.data.orders || [];
@@ -71,14 +69,22 @@ export default function AccountPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/auth/login?redirect=/account");
+      return;
+    }
+    if (isAuthenticated) fetchProfile();
+  }, [isAuthenticated, authLoading, router, fetchProfile]);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaving(true);
     setMessage({ type: "", text: "" });
     try {
-      await axios.put(
+      const { data } = await axios.put(
         "/api/store/account",
         {
           firstName: profile.firstName,
@@ -88,6 +94,13 @@ export default function AccountPage() {
         },
         { headers: getAuthHeaders() }
       );
+      const updatedProfile = data?.customer || data;
+      setProfile(updatedProfile);
+      if (updatedProfile) {
+        const existing = JSON.parse(localStorage.getItem("storeCustomer") || "{}");
+        const merged = { ...existing, ...updatedProfile };
+        localStorage.setItem("storeCustomer", JSON.stringify(merged));
+      }
       setMessage({ type: "success", text: "Profile updated successfully." });
     } catch (err) {
       setMessage({

@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/mongodb";
 import Cart from "@/models/Cart";
+import Customer from "@/models/Customer";
 import { withCustomerAuth } from "@/utils/customerAuth";
 import {
   validateCartForCheckout,
@@ -52,6 +53,35 @@ async function handler(req, res) {
       notes,
       shippingCost,
     });
+
+    // Persist checkout address into customer profile if it's new.
+    const customer = await Customer.findById(customerId);
+    if (customer) {
+      const normalized = {
+        street: shippingAddress.street?.trim() || "",
+        city: shippingAddress.city?.trim() || "",
+        state: shippingAddress.state?.trim() || "",
+        postalCode: shippingAddress.postalCode?.trim() || "",
+        country: shippingAddress.country?.trim() || "Nigeria",
+      };
+      const addresses = customer.addresses || [];
+      const exists = addresses.some(
+        (a) =>
+          a.street === normalized.street &&
+          a.city === normalized.city &&
+          a.state === normalized.state &&
+          (a.postalCode || "") === normalized.postalCode
+      );
+      if (!exists && normalized.street && normalized.city && normalized.state) {
+        addresses.push({
+          label: "Checkout Address",
+          ...normalized,
+          isDefault: addresses.length === 0,
+        });
+        customer.addresses = addresses;
+        await customer.save();
+      }
+    }
 
     if (paymentMethod === "Paystack") {
       // Use Web_Place's own URL for Paystack callback
