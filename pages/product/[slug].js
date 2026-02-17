@@ -173,7 +173,26 @@ export default function ProductDetailPage({ product, relatedProducts }) {
           <div className="mt-16">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Related Products</h2>
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-              {relatedProducts.map((p) => <ProductCard key={p._id} product={p} />)}
+              {relatedProducts.map((p) => (
+                <ProductCard
+                  key={p._id}
+                  product={p}
+                  onAddToCart={async (productId) => {
+                    if (!isAuthenticated) {
+                      router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath || `/product/${product.slug}`)}`);
+                      return;
+                    }
+                    try {
+                      await addToCart(productId, 1);
+                      setNotification("Added to cart!");
+                      setTimeout(() => setNotification(""), 2000);
+                    } catch (error) {
+                      setNotification(error.response?.data?.error || "Failed to add to cart");
+                      setTimeout(() => setNotification(""), 3000);
+                    }
+                  }}
+                />
+              ))}
             </div>
           </div>
         )}

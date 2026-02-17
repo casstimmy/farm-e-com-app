@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
 import { formatCurrency } from "@/utils/formatting";
+import { useStore } from "@/context/StoreContext";
 import {
   FaChevronLeft,
   FaPaw,
@@ -14,9 +15,9 @@ import {
   FaTag,
   FaDna,
   FaRulerVertical,
-  FaPhone,
   FaEnvelope,
-  FaWhatsapp,
+  FaShoppingCart,
+  FaSpinner,
   FaShieldAlt,
   FaTruck,
   FaCheckCircle,
@@ -24,7 +25,10 @@ import {
 
 export default function AnimalDetailPage({ animal, relatedAnimals }) {
   const router = useRouter();
+  const { addToCart, isAuthenticated } = useStore();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [adding, setAdding] = useState(false);
+  const [notice, setNotice] = useState("");
 
   if (!animal) {
     return (
@@ -136,6 +140,11 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
 
   return (
     <StoreLayout>
+      {notice && (
+        <div className="fixed top-20 right-4 z-50 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium">
+          {notice}
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -270,17 +279,44 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
               </p>
             </div>
 
-            {/* Inquiry Buttons */}
+            {/* Action Buttons */}
             <div className="flex gap-3 mb-6">
-              <a
-                href={`https://wa.me/?text=Hi, I'm interested in ${animal.name || animal.tagId} (${animal.species}${animal.breed ? ` - ${animal.breed}` : ""}) listed at ${formatCurrency(animal.projectedSalesPrice, "NGN")}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!isAuthenticated) {
+                    router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath || `/animals/${animal._id}`)}`);
+                    return;
+                  }
+                  setAdding(true);
+                  try {
+                    await addToCart(null, 1, null, { animalId: animal._id });
+                    setNotice("Animal added to cart");
+                    setTimeout(() => setNotice(""), 2200);
+                  } catch (error) {
+                    setNotice(error.response?.data?.error || "Failed to add to cart");
+                    setTimeout(() => setNotice(""), 2600);
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                disabled={adding}
                 className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-sm hover:shadow-md"
               >
-                <FaWhatsapp className="w-5 h-5" />
-                Inquire via WhatsApp
-              </a>
+                {adding ? (
+                  <FaSpinner className="w-5 h-5 animate-spin" />
+                ) : (
+                  <FaShoppingCart className="w-5 h-5" />
+                )}
+                {adding ? "Adding..." : "Add to Cart"}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/cart")}
+                className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-4 rounded-lg transition-all"
+              >
+                <FaShoppingCart className="w-4 h-4" />
+              </button>
               <a
                 href={`mailto:store@farm.com?subject=Inquiry: ${animal.name || animal.tagId}&body=Hi, I'm interested in ${animal.name || animal.tagId} (${animal.species}${animal.breed ? ` - ${animal.breed}` : ""}) listed at ${formatCurrency(animal.projectedSalesPrice, "NGN")}`}
                 className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-4 rounded-lg transition-all"

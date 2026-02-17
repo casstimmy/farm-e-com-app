@@ -32,6 +32,11 @@ const ProductSchema = new mongoose.Schema(
       ref: "Service",
       default: null,
     },
+    animalRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Animal",
+      default: null,
+    },
     images: [
       {
         url: { type: String, required: true },
@@ -65,6 +70,8 @@ ProductSchema.index({ storeCategory: 1 });
 ProductSchema.index({ isActive: 1, isFeatured: 1 });
 ProductSchema.index({ tags: 1 });
 ProductSchema.index({ inventoryItem: 1 });
+ProductSchema.index({ serviceRef: 1 });
+ProductSchema.index({ animalRef: 1 });
 ProductSchema.index({ price: 1 });
 ProductSchema.index({ createdAt: -1 });
 ProductSchema.index({ salesCount: -1 });

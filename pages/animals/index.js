@@ -79,7 +79,9 @@ export default function AnimalsPage({ initialAnimals, initialSpecies, initialBre
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState(initialPagination);
   const [showFilters, setShowFilters] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(
+    (initialAnimals?.length || 0) === 0
+  );
 
   // Filters
   const [selectedSpecies, setSelectedSpecies] = useState(initialFilters.species || "");

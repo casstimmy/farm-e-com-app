@@ -2,6 +2,8 @@ import dbConnect from "@/lib/mongodb";
 import Cart from "@/models/Cart";
 import Product from "@/models/Product";
 import Inventory from "@/models/Inventory";
+import Animal from "@/models/Animal";
+import Service from "@/models/Service";
 import { withCustomerAuth } from "@/utils/customerAuth";
 import { withRateLimit } from "@/lib/rateLimit";
 
@@ -39,8 +41,116 @@ async function getOrCreateProductForInventory(inventoryId) {
     isFeatured: false,
   });
 
-  await product.save();
-  return product;
+  try {
+    await product.save();
+    return product;
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existing = await Product.findOne({
+        inventoryItem: inventoryId,
+        isActive: true,
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
+}
+
+async function getOrCreateProductForService(serviceId) {
+  let product = await Product.findOne({ serviceRef: serviceId, isActive: true });
+  if (product) return product;
+
+  const service = await Service.findById(serviceId);
+  if (!service || !service.showOnSite || !service.isActive) return null;
+
+  const baseSlug = (service.name || "service")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const slug = `${baseSlug}-${service._id.toString().slice(-6)}`;
+
+  product = new Product({
+    name: service.name,
+    slug,
+    productType: "service",
+    serviceRef: service._id,
+    description: service.description || "",
+    price: service.price || 0,
+    costPrice: 0,
+    unit: service.unit || "Service",
+    trackInventory: false,
+    stockQuantity: 999999,
+    isActive: true,
+    isFeatured: false,
+  });
+
+  try {
+    await product.save();
+    return product;
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existing = await Product.findOne({
+        serviceRef: serviceId,
+        isActive: true,
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
+}
+
+async function getOrCreateProductForAnimal(animalId) {
+  let product = await Product.findOne({ animalRef: animalId, isActive: true });
+  if (product) return product;
+
+  const animal = await Animal.findById(animalId);
+  if (
+    !animal ||
+    animal.status !== "Alive" ||
+    animal.isArchived === true ||
+    !animal.projectedSalesPrice ||
+    animal.projectedSalesPrice <= 0
+  ) {
+    return null;
+  }
+
+  const baseName = animal.name || `${animal.species || "animal"}-${animal.tagId || "item"}`;
+  const baseSlug = baseName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const slug = `${baseSlug}-${animal._id.toString().slice(-6)}`;
+
+  product = new Product({
+    name: baseName,
+    slug,
+    productType: "physical",
+    animalRef: animal._id,
+    description: animal.notes || "",
+    price: animal.projectedSalesPrice,
+    costPrice: 0,
+    unit: "Animal",
+    trackInventory: true,
+    stockQuantity: 1,
+    isActive: true,
+    isFeatured: false,
+    tags: ["animal", (animal.species || "").toLowerCase()].filter(Boolean),
+    sku: `animal-${animal._id.toString()}`,
+  });
+
+  try {
+    await product.save();
+    return product;
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existing = await Product.findOne({
+        animalRef: animalId,
+        isActive: true,
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -118,14 +228,26 @@ async function handler(req, res) {
     }
   } else if (req.method === "POST") {
     try {
-      const { productId, inventoryId, quantity = 1 } = req.body;
+      const { productId, inventoryId, serviceId, animalId, quantity = 1 } = req.body;
 
-      if (!productId && !inventoryId) {
-        return res.status(400).json({ error: "Product ID or Inventory ID is required" });
+      if (!productId && !inventoryId && !serviceId && !animalId) {
+        return res.status(400).json({
+          error: "Provide one of productId, inventoryId, serviceId, or animalId",
+        });
       }
 
       let product;
-      if (inventoryId) {
+      if (animalId) {
+        product = await getOrCreateProductForAnimal(animalId);
+        if (!product) {
+          return res.status(404).json({ error: "Animal not available" });
+        }
+      } else if (serviceId) {
+        product = await getOrCreateProductForService(serviceId);
+        if (!product) {
+          return res.status(404).json({ error: "Service not available" });
+        }
+      } else if (inventoryId) {
         // Auto-find or create a Product for this inventory item
         product = await getOrCreateProductForInventory(inventoryId);
         if (!product) {
@@ -170,8 +292,9 @@ async function handler(req, res) {
           ],
         });
       } else {
+        const productIdStr = product._id.toString();
         const existingItem = cart.items.find(
-          (item) => item.product.toString() === productId
+          (item) => item.product.toString() === productIdStr
         );
 
         if (existingItem) {

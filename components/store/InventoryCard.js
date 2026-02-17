@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { formatCurrency } from "@/utils/formatting";
-import { FaBox, FaShoppingCart } from "react-icons/fa";
+import { FaBox, FaShoppingCart, FaSpinner } from "react-icons/fa";
+import { useState } from "react";
 
 /**
  * InventoryCard — Product card for inventory items sold on the store.
  * Displays item name, category, price, stock, and unit.
  */
 export default function InventoryCard({ item, currency = "NGN", onAddToCart }) {
+  const [adding, setAdding] = useState(false);
   const isInStock = item.quantity > 0;
   const isLowStock = item.quantity > 0 && item.quantity <= (item.minStock || 5);
 
@@ -79,17 +81,46 @@ export default function InventoryCard({ item, currency = "NGN", onAddToCart }) {
           )}
 
           {/* View / Add to Cart */}
-          <Link
-            href={`/shop/${item._id}`}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              isInStock
-                ? "bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            <FaShoppingCart className="w-3.5 h-3.5" />
-            {isInStock ? "View Product" : "Out of Stock"}
-          </Link>
+          {onAddToCart ? (
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!isInStock || adding) return;
+                setAdding(true);
+                try {
+                  await onAddToCart(item);
+                } finally {
+                  setAdding(false);
+                }
+              }}
+              disabled={!isInStock || adding}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                isInStock
+                  ? "bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              {adding ? (
+                <FaSpinner className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FaShoppingCart className="w-3.5 h-3.5" />
+              )}
+              {isInStock ? (adding ? "Adding..." : "Add to Cart") : "Out of Stock"}
+            </button>
+          ) : (
+            <Link
+              href={`/shop/${item._id}`}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                isInStock
+                  ? "bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <FaShoppingCart className="w-3.5 h-3.5" />
+              {isInStock ? "View Product" : "Out of Stock"}
+            </Link>
+          )}
         </div>
       </div>
     </div>

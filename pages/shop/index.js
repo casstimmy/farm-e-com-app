@@ -4,6 +4,7 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import InventoryCard from "@/components/store/InventoryCard";
+import { useStore } from "@/context/StoreContext";
 import dbConnect from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
 import InventoryCategory from "@/models/InventoryCategory";
@@ -61,11 +62,13 @@ export async function getServerSideProps({ query }) {
  */
 export default function ShopPage({ initialItems, initialCategories, initialPagination, initialFilters }) {
   const router = useRouter();
+  const { addToCart, isAuthenticated } = useStore();
   const [items, setItems] = useState(initialItems);
   const [categories, setCategories] = useState(initialCategories);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState(initialPagination);
   const [showFilters, setShowFilters] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const [selectedCategory, setSelectedCategory] = useState(initialFilters.category || "");
   const [sortBy, setSortBy] = useState(initialFilters.sort || "newest");
@@ -126,8 +129,29 @@ export default function ShopPage({ initialItems, initialCategories, initialPagin
 
   const hasActiveFilters = selectedCategory || searchTerm || sortBy !== "newest";
 
+  const handleDirectAddToCart = async (item) => {
+    if (!isAuthenticated) {
+      router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath || "/shop")}`);
+      return;
+    }
+
+    try {
+      await addToCart(null, 1, item._id);
+      setNotice(`${item.item} added to cart`);
+      setTimeout(() => setNotice(""), 2200);
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Failed to add to cart");
+      setTimeout(() => setNotice(""), 2600);
+    }
+  };
+
   return (
     <StoreLayout>
+      {notice && (
+        <div className="fixed top-20 right-4 z-50 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium">
+          {notice}
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-amber-600 to-orange-500 rounded-2xl p-8 mb-8 text-white">
@@ -318,7 +342,10 @@ export default function ShopPage({ initialItems, initialCategories, initialPagin
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <InventoryCard item={item} />
+                      <InventoryCard
+                        item={item}
+                        onAddToCart={handleDirectAddToCart}
+                      />
                     </motion.div>
                   ))}
                 </div>

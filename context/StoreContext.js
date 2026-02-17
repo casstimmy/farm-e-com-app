@@ -101,7 +101,7 @@ export function StoreProvider({ children }) {
   }, [getAuthHeaders]);
 
   const addToCart = useCallback(
-    async (productId, quantity = 1, inventoryId = null) => {
+    async (productId, quantity = 1, inventoryId = null, extra = null) => {
       if (!customer) {
         throw new Error("Please log in to add items to your cart");
       }
@@ -111,6 +111,9 @@ export function StoreProvider({ children }) {
         body.inventoryId = inventoryId;
       } else {
         body.productId = productId;
+      }
+      if (extra && typeof extra === "object") {
+        Object.assign(body, extra);
       }
 
       const { data } = await axios.post(

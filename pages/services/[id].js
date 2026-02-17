@@ -1,13 +1,15 @@
+import { useState } from "react";
 import { useRouter } from "next/router";
 import StoreLayout from "@/components/store/StoreLayout";
 import ServiceCard from "@/components/store/ServiceCard";
 import { formatCurrency } from "@/utils/formatting";
+import { useStore } from "@/context/StoreContext";
 import {
   FaChevronLeft,
   FaConciergeBell,
-  FaWhatsapp,
   FaEnvelope,
-  FaPhone,
+  FaShoppingCart,
+  FaSpinner,
   FaCheckCircle,
   FaClock,
   FaShieldAlt,
@@ -25,6 +27,9 @@ import {
 
 export default function ServiceDetailPage({ service, relatedServices }) {
   const router = useRouter();
+  const { addToCart, isAuthenticated } = useStore();
+  const [adding, setAdding] = useState(false);
+  const [notice, setNotice] = useState("");
 
   if (!service) {
     return (
@@ -77,6 +82,11 @@ export default function ServiceDetailPage({ service, relatedServices }) {
 
   return (
     <StoreLayout>
+      {notice && (
+        <div className="fixed top-20 right-4 z-50 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium">
+          {notice}
+        </div>
+      )}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -161,28 +171,49 @@ export default function ServiceDetailPage({ service, relatedServices }) {
           {/* Action Buttons */}
           <div className="bg-gray-50 px-8 py-5 border-t border-gray-100">
             <div className="flex flex-col sm:flex-row gap-3">
-              <a
-                href={`https://wa.me/?text=Hi, I'm interested in your "${service.name}" service${service.price > 0 ? ` (${formatCurrency(service.price, "NGN")}${service.unit ? ` per ${service.unit}` : ""})` : ""}. Can you provide more details?`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!isAuthenticated) {
+                    router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath || `/services/${service._id}`)}`);
+                    return;
+                  }
+                  setAdding(true);
+                  try {
+                    await addToCart(null, 1, null, { serviceId: service._id });
+                    setNotice("Service added to cart");
+                    setTimeout(() => setNotice(""), 2200);
+                  } catch (error) {
+                    setNotice(error.response?.data?.error || "Failed to add to cart");
+                    setTimeout(() => setNotice(""), 2600);
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                disabled={adding}
                 className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-sm hover:shadow-md"
               >
-                <FaWhatsapp className="w-5 h-5" />
-                Book via WhatsApp
-              </a>
+                {adding ? (
+                  <FaSpinner className="w-5 h-5 animate-spin" />
+                ) : (
+                  <FaShoppingCart className="w-5 h-5" />
+                )}
+                {adding ? "Adding..." : "Add to Cart"}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/checkout")}
+                className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-white font-semibold py-3 px-6 rounded-lg transition-all"
+              >
+                <FaShoppingCart className="w-5 h-5" />
+                Checkout
+              </button>
               <a
                 href={`mailto:store@farm.com?subject=Service Inquiry: ${service.name}&body=Hi, I'd like to inquire about your "${service.name}" service.`}
                 className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-white font-semibold py-3 px-6 rounded-lg transition-all"
               >
                 <FaEnvelope className="w-5 h-5" />
                 Email Us
-              </a>
-              <a
-                href="tel:+2348000000000"
-                className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-white font-semibold py-3 px-6 rounded-lg transition-all"
-              >
-                <FaPhone className="w-5 h-5" />
-                Call
               </a>
             </div>
           </div>
