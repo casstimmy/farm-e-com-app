@@ -35,7 +35,7 @@ const paymentClassMap = {
 
 export default function OrderConfirmationPage() {
   const router = useRouter();
-  const { isAuthenticated, getAuthHeaders } = useStore();
+  const { isAuthenticated, getAuthHeaders, fetchCart } = useStore();
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
@@ -61,6 +61,7 @@ export default function OrderConfirmationPage() {
       setLoading(true);
       setError("");
       try {
+        await fetchCart();
         const { data } = await axios.get(
           `/api/store/orders?order=${encodeURIComponent(orderNumber)}`,
           { headers: getAuthHeaders() }
@@ -74,7 +75,7 @@ export default function OrderConfirmationPage() {
     };
 
     loadOrder();
-  }, [router.isReady, orderNumber, isAuthenticated, getAuthHeaders, router]);
+  }, [router.isReady, orderNumber, isAuthenticated, getAuthHeaders, fetchCart, router]);
 
   const statusStyle = statusClassMap[order?.status] || "bg-gray-100 text-gray-700 border-gray-200";
   const paymentStyle = paymentClassMap[order?.paymentStatus] || "bg-gray-50 text-gray-700 border-gray-200";
@@ -302,4 +303,3 @@ export default function OrderConfirmationPage() {
     </StoreLayout>
   );
 }
-
