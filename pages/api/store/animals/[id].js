@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Animal from "@/models/Animal";
 import Location from "@/models/Location";
@@ -15,6 +16,10 @@ export default async function handler(req, res) {
   }
 
   const { id } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid animal ID" });
+  }
 
   await dbConnect();
 
@@ -57,6 +62,11 @@ export default async function handler(req, res) {
       .populate("location", "name")
       .select("tagId name species breed gender currentWeight projectedSalesPrice images")
       .lean();
+
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300"
+    );
 
     res.status(200).json({ animal, relatedAnimals });
   } catch (error) {

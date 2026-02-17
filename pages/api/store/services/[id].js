@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Service from "@/models/Service";
 
@@ -11,6 +12,10 @@ export default async function handler(req, res) {
   }
 
   const { id } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid service ID" });
+  }
 
   await dbConnect();
 
@@ -34,6 +39,11 @@ export default async function handler(req, res) {
     })
       .limit(4)
       .lean();
+
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300"
+    );
 
     res.status(200).json({ service, relatedServices });
   } catch (error) {

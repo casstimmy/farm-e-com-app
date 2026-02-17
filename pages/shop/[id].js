@@ -1,5 +1,4 @@
 import { useRouter } from "next/router";
-import axios from "axios";
 import StoreLayout from "@/components/store/StoreLayout";
 import InventoryCard from "@/components/store/InventoryCard";
 import { formatCurrency } from "@/utils/formatting";
@@ -224,16 +223,60 @@ export default function InventoryDetailPage({ item, relatedItems }) {
   );
 }
 
-export async function getServerSideProps({ params }) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+export async function getServerSideProps({ params, res }) {
+  const mongoose = (await import("mongoose")).default;
+  const { default: dbConnect } = await import("@/lib/mongodb");
+  const { default: Inventory } = await import("@/models/Inventory");
+
+  if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    return { props: { item: null, relatedItems: [] } };
+  }
+
   try {
-    const { data } = await axios.get(
-      `${baseUrl}/api/store/inventory/${params.id}`
-    );
-    return {
-      props: { item: data.item, relatedItems: data.relatedItems || [] },
+    await dbConnect();
+
+    const item = await Inventory.findOne({
+      _id: params.id,
+      showOnSite: true,
+      quantity: { $gt: 0 },
+    })
+      .select("-costPrice -marginPercent -totalConsumed -minStock -medication")
+      .lean();
+
+    if (!item) {
+      return { props: { item: null, relatedItems: [] } };
+    }
+
+    // Related items (same category)
+    const relatedFilter = {
+      _id: { $ne: item._id },
+      showOnSite: true,
+      quantity: { $gt: 0 },
     };
-  } catch {
+    if (item.categoryId) {
+      relatedFilter.categoryId = item.categoryId;
+    } else if (item.categoryName) {
+      relatedFilter.categoryName = item.categoryName;
+    }
+
+    const relatedItems = await Inventory.find(relatedFilter)
+      .limit(4)
+      .select("item salesPrice price quantity unit categoryName")
+      .lean();
+
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300"
+    );
+
+    return {
+      props: {
+        item: JSON.parse(JSON.stringify(item)),
+        relatedItems: JSON.parse(JSON.stringify(relatedItems)),
+      },
+    };
+  } catch (error) {
+    console.error("Shop item SSR error:", error);
     return { props: { item: null, relatedItems: [] } };
   }
 }

@@ -71,6 +71,12 @@ export default async function handler(req, res) {
       ]),
     ]);
 
+    // Cache homepage data for 30s, revalidate up to 2 min
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=30, stale-while-revalidate=120"
+    );
+
     res.status(200).json({
       animals,
       inventoryItems,

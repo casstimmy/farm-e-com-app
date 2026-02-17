@@ -316,7 +316,7 @@ export default function StoreLayout({ children }) {
               </h4>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>Email: store@farm.com</li>
-                <li>Phone: +234 800 000 0000</li>
+                <li>Phone: +0905 858 9953</li>
               </ul>
             </div>
           </div>

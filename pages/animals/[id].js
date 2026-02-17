@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import axios from "axios";
-import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
 import { formatCurrency } from "@/utils/formatting";
@@ -370,19 +368,77 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
   );
 }
 
-export async function getServerSideProps({ params }) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+export async function getServerSideProps({ params, res }) {
+  const mongoose = (await import("mongoose")).default;
+  const { default: dbConnect } = await import("@/lib/mongodb");
+  const { default: Animal } = await import("@/models/Animal");
+  // Ensure Location model is registered for populate
+  await import("@/models/Location");
+
+  if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    return { props: { animal: null, relatedAnimals: [] } };
+  }
+
   try {
-    const { data } = await axios.get(
-      `${baseUrl}/api/store/animals/${params.id}`
+    await dbConnect();
+
+    const animal = await Animal.findOne({
+      _id: params.id,
+      status: "Alive",
+      isArchived: { $ne: true },
+      projectedSalesPrice: { $gt: 0 },
+    })
+      .populate("location", "name city state address")
+      .select(
+        "-purchaseCost -totalFeedCost -totalMedicationCost -marginPercent -sire -dam -recordedBy -isArchived -archivedAt -archivedReason"
+      )
+      .lean();
+
+    if (!animal) {
+      return { props: { animal: null, relatedAnimals: [] } };
+    }
+
+    // Calculate age server-side
+    if (animal.dob) {
+      const now = new Date();
+      const birth = new Date(animal.dob);
+      const months =
+        (now.getFullYear() - birth.getFullYear()) * 12 +
+        (now.getMonth() - birth.getMonth());
+      animal.ageMonths = months;
+      animal.ageDisplay =
+        months >= 12
+          ? `${Math.floor(months / 12)} year${Math.floor(months / 12) > 1 ? "s" : ""} ${months % 12 > 0 ? `${months % 12} month${months % 12 > 1 ? "s" : ""}` : ""}`
+          : `${months} month${months !== 1 ? "s" : ""}`;
+    }
+
+    const relatedAnimals = await Animal.find({
+      _id: { $ne: animal._id },
+      species: animal.species,
+      status: "Alive",
+      isArchived: { $ne: true },
+      projectedSalesPrice: { $gt: 0 },
+    })
+      .limit(4)
+      .populate("location", "name")
+      .select(
+        "tagId name species breed gender currentWeight projectedSalesPrice images dob location"
+      )
+      .lean();
+
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300"
     );
+
     return {
       props: {
-        animal: data.animal,
-        relatedAnimals: data.relatedAnimals || [],
+        animal: JSON.parse(JSON.stringify(animal)),
+        relatedAnimals: JSON.parse(JSON.stringify(relatedAnimals)),
       },
     };
-  } catch {
+  } catch (error) {
+    console.error("Animal SSR error:", error);
     return { props: { animal: null, relatedAnimals: [] } };
   }
 }

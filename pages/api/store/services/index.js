@@ -84,6 +84,11 @@ export default async function handler(req, res) {
       { $sort: { count: -1 } },
     ]);
 
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=30, stale-while-revalidate=120"
+    );
+
     res.status(200).json({
       services,
       categories: categoryCounts.map((c) => ({

@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { useRouter } from "next/router";
-import axios from "axios";
 import StoreLayout from "@/components/store/StoreLayout";
 import ServiceCard from "@/components/store/ServiceCard";
 import { formatCurrency } from "@/utils/formatting";
@@ -251,19 +249,53 @@ export default function ServiceDetailPage({ service, relatedServices }) {
   );
 }
 
-export async function getServerSideProps({ params }) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+export async function getServerSideProps({ params, res }) {
+  const mongoose = (await import("mongoose")).default;
+  const { default: dbConnect } = await import("@/lib/mongodb");
+  const { default: Service } = await import("@/models/Service");
+
+  // Validate ObjectId
+  if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    return { props: { service: null, relatedServices: [] } };
+  }
+
   try {
-    const { data } = await axios.get(
-      `${baseUrl}/api/store/services/${params.id}`
+    await dbConnect();
+
+    const service = await Service.findOne({
+      _id: params.id,
+      showOnSite: true,
+      isActive: true,
+    }).lean();
+
+    if (!service) {
+      return { props: { service: null, relatedServices: [] } };
+    }
+
+    // Related services
+    const relatedServices = await Service.find({
+      _id: { $ne: service._id },
+      category: service.category,
+      showOnSite: true,
+      isActive: true,
+    })
+      .limit(4)
+      .lean();
+
+    // Cache for 60 seconds, stale-while-revalidate for 5 min
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300"
     );
+
     return {
       props: {
-        service: data.service,
-        relatedServices: data.relatedServices || [],
+        service: JSON.parse(JSON.stringify(service)),
+        relatedServices: JSON.parse(JSON.stringify(relatedServices)),
       },
     };
-  } catch {
+  } catch (error) {
+    console.error("Service SSR error:", error);
     return { props: { service: null, relatedServices: [] } };
   }
 }

@@ -1,8 +1,9 @@
+import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Inventory from "@/models/Inventory";
 
 /**
- * Single Inventory Item Detail
+ * Single Inventory Item Detail API
  * GET /api/store/inventory/[id]
  */
 export default async function handler(req, res) {
@@ -11,6 +12,10 @@ export default async function handler(req, res) {
   }
 
   const { id } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid item ID" });
+  }
 
   await dbConnect();
 
@@ -37,6 +42,11 @@ export default async function handler(req, res) {
       .limit(4)
       .select("item salesPrice quantity unit categoryName")
       .lean();
+
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300"
+    );
 
     res.status(200).json({ item, relatedItems });
   } catch (error) {
