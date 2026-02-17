@@ -1,4 +1,5 @@
 import dbConnect from "@/lib/mongodb";
+import mongoose from "mongoose";
 import Cart from "@/models/Cart";
 import Product from "@/models/Product";
 import Inventory from "@/models/Inventory";
@@ -7,14 +8,28 @@ import Service from "@/models/Service";
 import { withCustomerAuth } from "@/utils/customerAuth";
 import { withRateLimit } from "@/lib/rateLimit";
 
+async function ensureUniqueSlug(baseSlug) {
+  let slug = baseSlug;
+  const exists = await Product.findOne({ slug }).select("_id").lean();
+  if (!exists) return slug;
+  slug = `${baseSlug}-${Date.now().toString(36)}`;
+  return slug;
+}
+
 /**
  * Find or auto-create a Product for an inventory item.
  * This bridges the Inventory-based shop pages with the Product-based cart.
  */
 async function getOrCreateProductForInventory(inventoryId) {
   // Check if a Product already exists for this inventory item
-  let product = await Product.findOne({ inventoryItem: inventoryId, isActive: true });
-  if (product) return product;
+  let product = await Product.findOne({ inventoryItem: inventoryId });
+  if (product) {
+    if (!product.isActive) {
+      product.isActive = true;
+      await product.save();
+    }
+    return product;
+  }
 
   // Fetch the inventory item
   const inv = await Inventory.findById(inventoryId);
@@ -25,7 +40,9 @@ async function getOrCreateProductForInventory(inventoryId) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  const slug = `${baseSlug}-${inv._id.toString().slice(-6)}`;
+  const slug = await ensureUniqueSlug(
+    `${baseSlug}-${inv._id.toString().slice(-6)}`
+  );
 
   // Auto-create a Product linked to this inventory item
   product = new Product({
@@ -57,8 +74,14 @@ async function getOrCreateProductForInventory(inventoryId) {
 }
 
 async function getOrCreateProductForService(serviceId) {
-  let product = await Product.findOne({ serviceRef: serviceId, isActive: true });
-  if (product) return product;
+  let product = await Product.findOne({ serviceRef: serviceId });
+  if (product) {
+    if (!product.isActive) {
+      product.isActive = true;
+      await product.save();
+    }
+    return product;
+  }
 
   const service = await Service.findById(serviceId);
   if (!service || !service.showOnSite || !service.isActive) return null;
@@ -67,7 +90,9 @@ async function getOrCreateProductForService(serviceId) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  const slug = `${baseSlug}-${service._id.toString().slice(-6)}`;
+  const slug = await ensureUniqueSlug(
+    `${baseSlug}-${service._id.toString().slice(-6)}`
+  );
 
   product = new Product({
     name: service.name,
@@ -100,8 +125,14 @@ async function getOrCreateProductForService(serviceId) {
 }
 
 async function getOrCreateProductForAnimal(animalId) {
-  let product = await Product.findOne({ animalRef: animalId, isActive: true });
-  if (product) return product;
+  let product = await Product.findOne({ animalRef: animalId });
+  if (product) {
+    if (!product.isActive) {
+      product.isActive = true;
+      await product.save();
+    }
+    return product;
+  }
 
   const animal = await Animal.findById(animalId);
   if (
@@ -119,7 +150,9 @@ async function getOrCreateProductForAnimal(animalId) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  const slug = `${baseSlug}-${animal._id.toString().slice(-6)}`;
+  const slug = await ensureUniqueSlug(
+    `${baseSlug}-${animal._id.toString().slice(-6)}`
+  );
 
   product = new Product({
     name: baseName,
@@ -235,6 +268,18 @@ async function handler(req, res) {
           error: "Provide one of productId, inventoryId, serviceId, or animalId",
         });
       }
+      if (productId && !mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ error: "Invalid productId" });
+      }
+      if (inventoryId && !mongoose.Types.ObjectId.isValid(inventoryId)) {
+        return res.status(400).json({ error: "Invalid inventoryId" });
+      }
+      if (serviceId && !mongoose.Types.ObjectId.isValid(serviceId)) {
+        return res.status(400).json({ error: "Invalid serviceId" });
+      }
+      if (animalId && !mongoose.Types.ObjectId.isValid(animalId)) {
+        return res.status(400).json({ error: "Invalid animalId" });
+      }
 
       let product;
       if (animalId) {
@@ -320,6 +365,7 @@ async function handler(req, res) {
 
       res.status(200).json({ message: "Item added to cart", itemCount: cart.itemCount });
     } catch (error) {
+      console.error("Cart POST error:", error);
       res.status(500).json({ error: "Failed to update cart" });
     }
   } else if (req.method === "PUT") {
