@@ -65,7 +65,6 @@ const ProductSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-ProductSchema.index({ slug: 1 }, { unique: true });
 ProductSchema.index({ storeCategory: 1 });
 ProductSchema.index({ isActive: 1, isFeatured: 1 });
 ProductSchema.index({ tags: 1 });
@@ -80,14 +79,13 @@ ProductSchema.index(
   { weights: { name: 10, tags: 5, description: 1 } }
 );
 
-ProductSchema.pre("validate", function (next) {
+ProductSchema.pre("validate", function () {
   if (this.isModified("name") && !this.slug) {
     this.slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
   }
-  next();
 });
 
 ProductSchema.virtual("isInStock").get(function () {
