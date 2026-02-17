@@ -1,14 +1,14 @@
 import dbConnect from "@/lib/mongodb";
 import Product from "@/models/Product";
+import Inventory from "@/models/Inventory";
 import { withAdminAuth } from "@/utils/adminAuth";
-import { fetchPublicProducts } from "@/lib/farmApi";
 
 /**
  * Admin inventory sync endpoint.
  * POST /api/admin/store/sync-inventory
  *
- * Fetches current stock levels from farm-health-app and updates
- * Web_Place Product stockQuantity accordingly.
+ * Reads current stock levels directly from the shared Inventory collection
+ * and updates Web_Place Product stockQuantity accordingly.
  */
 async function handler(req, res) {
   if (req.method !== "POST") {
@@ -22,37 +22,43 @@ async function handler(req, res) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    // Fetch inventory data from farm-health-app
-    let farmProducts = [];
-    try {
-      const result = await fetchPublicProducts({ limit: 1000 });
-      farmProducts = result.products || result || [];
-    } catch (err) {
-      console.warn("Could not fetch from farm API, syncing locally only:", err.message);
+    // Find all products that track inventory (linked to an Inventory item)
+    const products = await Product.find({
+      inventoryItem: { $exists: true, $ne: null },
+    });
+
+    if (products.length === 0) {
+      return res.status(200).json({
+        message: "No inventory-linked products found",
+        updatedCount: 0,
+      });
     }
 
-    // Update local products that have matching inventory items
-    let updatedCount = 0;
-    const products = await Product.find({ trackInventory: true });
+    // Get all linked inventory item IDs
+    const inventoryIds = products.map((p) => p.inventoryItem);
+    const inventoryItems = await Inventory.find({ _id: { $in: inventoryIds } }).lean();
 
+    // Build lookup map
+    const inventoryMap = {};
+    for (const item of inventoryItems) {
+      inventoryMap[item._id.toString()] = item;
+    }
+
+    // Sync stock quantities
+    let updatedCount = 0;
     for (const product of products) {
-      // Match by inventoryItem reference if it exists
-      if (product.inventoryItem) {
-        const farmItem = farmProducts.find(
-          (fp) => fp.inventoryItemId === product.inventoryItem.toString()
-        );
-        if (farmItem && farmItem.stockQuantity !== undefined) {
-          product.stockQuantity = farmItem.stockQuantity;
-          await product.save();
-          updatedCount++;
-        }
+      const invItem = inventoryMap[product.inventoryItem.toString()];
+      if (invItem && product.stockQuantity !== invItem.quantity) {
+        product.stockQuantity = invItem.quantity;
+        await product.save();
+        updatedCount++;
       }
     }
 
     res.status(200).json({
       message: `Stock synchronized for ${updatedCount} product(s)`,
       updatedCount,
-      farmProductsCount: farmProducts.length,
+      totalChecked: products.length,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

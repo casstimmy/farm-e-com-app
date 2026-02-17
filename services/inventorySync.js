@@ -1,20 +1,20 @@
 import Product from "@/models/Product";
 import Order from "@/models/Order";
-import { deductStock, restoreStock, registerSale } from "@/lib/farmApi";
+import Inventory from "@/models/Inventory";
+import Finance from "@/models/Finance";
 
 /**
  * Inventory Synchronization Service
  *
- * In the standalone Web_Place architecture, this service communicates
- * with the farm-health-app via REST API for all inventory and finance
- * operations. Product.stockQuantity is the local cache; the farm
- * Inventory model remains the source of truth.
+ * Both Web_Place and farm-health-app share the same MongoDB database.
+ * This service directly reads/writes the Inventory and Finance
+ * collections — no REST API dependency.
  */
 
 /**
  * Deduct inventory for a paid order.
- * - Calls the farm-health-app REST API to deduct stock
- * - Updates local Product stockQuantity
+ * - Directly decrements Inventory.quantity in the shared database
+ * - Updates local Product stockQuantity cache
  * - Marks order.inventoryDeducted = true
  */
 export async function deductInventoryForOrder(orderId) {
@@ -22,41 +22,32 @@ export async function deductInventoryForOrder(orderId) {
   if (!order) throw new Error("Order not found");
   if (order.inventoryDeducted) return { success: true, errors: [] };
 
-  // Build deduction items for the farm API
-  const deductionItems = order.items
-    .filter((item) => item.inventoryItem)
-    .map((item) => ({
-      inventoryItemId: item.inventoryItem.toString(),
-      quantity: item.quantity,
-      productName: item.name,
-    }));
+  const errors = [];
 
-  let errors = [];
-
-  if (deductionItems.length > 0) {
-    try {
-      const result = await deductStock(deductionItems);
-      errors = result.errors || [];
-    } catch (err) {
-      console.error("Farm API deduct-stock error:", err.message);
-      errors.push({ product: "API", reason: err.message });
-    }
-  }
-
-  // Update local product stock cache
   for (const item of order.items) {
     if (!item.inventoryItem) continue;
-    await Product.updateMany(
-      { inventoryItem: item.inventoryItem },
-      { $inc: { stockQuantity: -item.quantity } }
-    );
-  }
 
-  // Ensure no negative stock locally
-  await Product.updateMany(
-    { stockQuantity: { $lt: 0 } },
-    { $set: { stockQuantity: 0 } }
-  );
+    try {
+      const inv = await Inventory.findById(item.inventoryItem);
+      if (!inv) {
+        errors.push({ product: item.name, reason: "Inventory item not found" });
+        continue;
+      }
+
+      const newQty = Math.max(0, inv.quantity - item.quantity);
+      inv.quantity = newQty;
+      inv.totalConsumed = (inv.totalConsumed || 0) + item.quantity;
+      await inv.save();
+
+      // Update local Product stock cache
+      await Product.updateMany(
+        { inventoryItem: item.inventoryItem },
+        { $set: { stockQuantity: newQty } }
+      );
+    } catch (err) {
+      errors.push({ product: item.name, reason: err.message });
+    }
+  }
 
   if (errors.length === 0) {
     order.inventoryDeducted = true;
@@ -74,29 +65,25 @@ export async function restoreInventoryForOrder(orderId) {
   if (!order) throw new Error("Order not found");
   if (!order.inventoryDeducted) return;
 
-  const restoreItems = order.items
-    .filter((item) => item.inventoryItem)
-    .map((item) => ({
-      inventoryItemId: item.inventoryItem.toString(),
-      quantity: item.quantity,
-      productName: item.name,
-    }));
-
-  if (restoreItems.length > 0) {
-    try {
-      await restoreStock(restoreItems);
-    } catch (err) {
-      console.error("Farm API restore-stock error:", err.message);
-    }
-  }
-
-  // Update local product stock cache
   for (const item of order.items) {
     if (!item.inventoryItem) continue;
-    await Product.updateMany(
-      { inventoryItem: item.inventoryItem },
-      { $inc: { stockQuantity: item.quantity } }
-    );
+
+    try {
+      const inv = await Inventory.findById(item.inventoryItem);
+      if (!inv) continue;
+
+      inv.quantity += item.quantity;
+      inv.totalConsumed = Math.max(0, (inv.totalConsumed || 0) - item.quantity);
+      await inv.save();
+
+      // Update local Product stock cache
+      await Product.updateMany(
+        { inventoryItem: item.inventoryItem },
+        { $set: { stockQuantity: inv.quantity } }
+      );
+    } catch (err) {
+      console.error(`Restore stock error for ${item.name}:`, err.message);
+    }
   }
 
   order.inventoryDeducted = false;
@@ -105,46 +92,42 @@ export async function restoreInventoryForOrder(orderId) {
 
 /**
  * Create a Finance Income record for a completed order
- * by calling the farm-health-app REST API.
+ * directly in the shared Finance collection.
  */
 export async function createSalesFinanceRecord(order) {
   if (order.financeRecordId) return null;
 
   const costOfGoods = order.items.reduce(
-    (sum, item) => sum + item.costPrice * item.quantity,
+    (sum, item) => sum + (item.costPrice || 0) * item.quantity,
     0
   );
 
   try {
-    const result = await registerSale({
-      orderNumber: order.orderNumber,
-      total: order.total,
-      subtotal: order.subtotal,
-      shippingCost: order.shippingCost,
-      costOfGoods,
-      customerName: order.customerName,
-      customerEmail: order.customerEmail,
-      itemCount: order.items.length,
-      paymentMethod: order.paymentMethod,
-      paidAt: order.paidAt || new Date(),
+    const financeRecord = await Finance.create({
+      date: order.paidAt || new Date(),
+      type: "Income",
+      category: "Store Sales",
+      title: `Online Order #${order.orderNumber}`,
+      description: `${order.items.length} item(s) — ${order.customerName} (${order.customerEmail})`,
+      amount: order.total,
+      paymentMethod: order.paymentMethod === "paystack" ? "Bank Transfer" : "Cash",
+      status: "Completed",
+      notes: `Subtotal: ${order.subtotal}, Shipping: ${order.shippingCost || 0}, COGS: ${costOfGoods}`,
     });
 
-    if (result.financeRecordId) {
-      await Order.findByIdAndUpdate(order._id, {
-        financeRecordId: result.financeRecordId,
-      });
-    }
+    await Order.findByIdAndUpdate(order._id, {
+      financeRecordId: financeRecord._id,
+    });
 
-    return result;
+    return { financeRecordId: financeRecord._id };
   } catch (err) {
-    console.error("Farm API register-sale error:", err.message);
+    console.error("Create finance record error:", err.message);
     return null;
   }
 }
 
 /**
- * Sync a single Product's stockQuantity from the farm inventory system.
- * This is a lightweight local-only update used after admin operations.
+ * Sync a single Product's stockQuantity from the Inventory collection.
  */
 export async function syncProductStock(inventoryItemId, newQuantity) {
   if (!inventoryItemId) return;

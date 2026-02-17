@@ -1,293 +1,421 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import axios from "axios";
 import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
+import AnimalCard from "@/components/store/AnimalCard";
+import InventoryCard from "@/components/store/InventoryCard";
+import ServiceCard from "@/components/store/ServiceCard";
 import ProductCard from "@/components/store/ProductCard";
 import { useStore } from "@/context/StoreContext";
-import { FaFilter, FaTimes, FaSpinner, FaSortAmountDown } from "react-icons/fa";
+import { formatCurrency } from "@/utils/formatting";
+import {
+  FaPaw,
+  FaBoxOpen,
+  FaConciergeBell,
+  FaArrowRight,
+  FaSpinner,
+  FaLeaf,
+  FaShieldAlt,
+  FaTruck,
+  FaCheckCircle,
+  FaSearch,
+} from "react-icons/fa";
 
-export default function StorePage() {
+export default function HomePage() {
   const router = useRouter();
-  const { addToCart, isAuthenticated } = useStore();
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({});
-  const [addingToCart, setAddingToCart] = useState(null);
-  const [notification, setNotification] = useState("");
-
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (router.query.search) setSearchTerm(router.query.search);
-    if (router.query.category) setSelectedCategory(router.query.category);
-    if (router.query.sort) setSortBy(router.query.sort);
-  }, [router.query]);
-
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = {
-        sort: sortBy,
-        page: router.query.page || 1,
-        limit: 20,
-      };
-      if (selectedCategory) params.category = selectedCategory;
-      if (searchTerm) params.search = searchTerm;
-
-      const { data } = await axios.get("/api/store/products", { params });
-      setProducts(data.products);
-      setPagination(data.pagination);
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-    } finally {
-      setLoading(false);
+    async function fetchFeatured() {
+      try {
+        const { data: featured } = await axios.get("/api/store/featured");
+        setData(featured);
+      } catch (err) {
+        console.error("Failed to load homepage:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [selectedCategory, sortBy, searchTerm, router.query.page]);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const { data } = await axios.get("/api/store/categories");
-      setCategories(data);
-    } catch (error) {
-      console.error("Failed to fetch categories:", error);
-    }
+    fetchFeatured();
   }, []);
 
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  const handleAddToCart = async (productId) => {
-    if (!isAuthenticated) {
-      router.push("/auth/login");
-      return;
-    }
-
-    setAddingToCart(productId);
-    try {
-      await addToCart(productId, 1);
-      setNotification("Added to cart!");
-      setTimeout(() => setNotification(""), 2000);
-    } catch (error) {
-      setNotification(error.response?.data?.error || "Failed to add to cart");
-      setTimeout(() => setNotification(""), 3000);
-    } finally {
-      setAddingToCart(null);
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/animals?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
-  const clearFilters = () => {
-    setSelectedCategory("");
-    setSortBy("newest");
-    setSearchTerm("");
-    router.push("/", undefined, { shallow: true });
+  // Species emoji/icon mapping
+  const speciesEmoji = {
+    Goat: "🐐",
+    Sheep: "🐑",
+    Cattle: "🐄",
+    Cow: "🐄",
+    Chicken: "🐔",
+    Poultry: "🐔",
+    Pig: "🐷",
+    Rabbit: "🐰",
+    Fish: "🐟",
+    Turkey: "🦃",
+    Duck: "🦆",
+    Horse: "🐴",
   };
 
-  const hasActiveFilters = selectedCategory || searchTerm || sortBy !== "newest";
+  if (loading) {
+    return (
+      <StoreLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <FaSpinner className="w-10 h-10 text-green-600 animate-spin" />
+        </div>
+      </StoreLayout>
+    );
+  }
 
   return (
     <StoreLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed top-20 right-4 z-50 bg-green-600 text-white px-5 py-3 rounded-lg shadow-lg text-sm font-medium"
-          >
-            {notification}
-          </motion.div>
-        )}
-
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {searchTerm ? `Search: "${searchTerm}"` : "Our Products"}
-          </h1>
-          <p className="text-gray-500 mt-1">
-            {pagination.totalCount
-              ? `${pagination.totalCount} product${pagination.totalCount !== 1 ? "s" : ""} available`
-              : "Browse our farm products"}
-          </p>
+      {/* Hero Section */}
+      <section className="relative bg-gradient-to-br from-green-800 via-green-700 to-emerald-600 text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-green-300 rounded-full blur-3xl" />
         </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+          <div className="max-w-3xl">
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6"
+            >
+              Quality Livestock,{" "}
+              <span className="text-green-300">Farm Products</span> &{" "}
+              <span className="text-emerald-300">Services</span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-lg sm:text-xl text-green-100 mb-8 leading-relaxed"
+            >
+              Browse healthy, well-raised animals for sale, farm supplies, and
+              professional agricultural services — all from one trusted source.
+            </motion.p>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="hidden lg:block w-64 flex-shrink-0">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sticky top-24">
-              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
-                Categories
-              </h3>
-              <ul className="space-y-1">
-                <li>
-                  <button
-                    onClick={() => setSelectedCategory("")}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      !selectedCategory
-                        ? "bg-green-50 text-green-700 font-medium"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    All Products
-                  </button>
-                </li>
-                {categories.map((cat) => (
-                  <li key={cat._id}>
-                    <button
-                      onClick={() => setSelectedCategory(cat._id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedCategory === cat._id
-                          ? "bg-green-50 text-green-700 font-medium"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {cat.name}
-                      {cat.productCount > 0 && (
-                        <span className="text-xs text-gray-400 ml-1">
-                          ({cat.productCount})
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-red-600 hover:text-red-700 py-2 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
-                >
-                  <FaTimes className="w-3 h-3" /> Clear Filters
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-6 bg-white rounded-xl border border-gray-100 px-4 py-3">
+            {/* Search */}
+            <motion.form
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              onSubmit={handleSearch}
+              className="flex max-w-lg"
+            >
+              <div className="relative flex-1">
+                <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search animals, products, services..."
+                  className="w-full pl-11 pr-4 py-4 rounded-l-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+                />
+              </div>
               <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="lg:hidden flex items-center gap-2 text-sm text-gray-600 font-medium"
+                type="submit"
+                className="bg-green-500 hover:bg-green-400 text-white font-semibold px-8 rounded-r-xl transition-colors"
               >
-                <FaFilter className="w-3.5 h-3.5" />
-                Filters
-                {hasActiveFilters && (
-                  <span className="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full">
-                    Active
-                  </span>
-                )}
+                Search
               </button>
+            </motion.form>
 
-              <div className="flex items-center gap-2 ml-auto">
-                <FaSortAmountDown className="w-3.5 h-3.5 text-gray-400" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="text-sm border-none focus:ring-0 text-gray-700 font-medium bg-transparent cursor-pointer pr-8"
-                >
-                  <option value="newest">Newest</option>
-                  <option value="price_asc">Price: Low to High</option>
-                  <option value="price_desc">Price: High to Low</option>
-                  <option value="popular">Most Popular</option>
-                  <option value="name_asc">Name: A to Z</option>
-                </select>
-              </div>
-            </div>
-
-            {showFilters && (
-              <div className="lg:hidden bg-white rounded-xl border border-gray-100 p-4 mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Categories</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSelectedCategory("")}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      !selectedCategory
-                        ? "bg-green-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    All
-                  </button>
-                  {categories.map((cat) => (
-                    <button
-                      key={cat._id}
-                      onClick={() => setSelectedCategory(cat._id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        selectedCategory === cat._id
-                          ? "bg-green-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
+            {/* Quick stats */}
+            {data?.totals && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="flex flex-wrap gap-6 mt-10 text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <FaPaw className="w-5 h-5 text-green-300" />
+                  <span>
+                    <strong className="text-white">{data.totals.animals}</strong>{" "}
+                    <span className="text-green-200">Animals</span>
+                  </span>
                 </div>
-              </div>
-            )}
-
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <FaSpinner className="w-8 h-8 text-green-600 animate-spin" />
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-xl border border-gray-100">
-                <div className="text-gray-300 text-6xl mb-4">📦</div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">No products found</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  {searchTerm
-                    ? `No results for "${searchTerm}"`
-                    : "No products match your filters"}
-                </p>
-                {hasActiveFilters && (
-                  <button onClick={clearFilters} className="text-sm text-green-600 hover:text-green-700 font-medium">
-                    Clear all filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                  {products.map((product) => (
-                    <motion.div
-                      key={product._id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <ProductCard product={product} onAddToCart={handleAddToCart} />
-                    </motion.div>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <FaBoxOpen className="w-5 h-5 text-green-300" />
+                  <span>
+                    <strong className="text-white">{data.totals.products}</strong>{" "}
+                    <span className="text-green-200">Products</span>
+                  </span>
                 </div>
-
-                {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-10">
-                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => router.push({ pathname: "/", query: { ...router.query, page } })}
-                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                          pagination.page === page
-                            ? "bg-green-600 text-white"
-                            : "bg-white text-gray-600 border border-gray-200 hover:bg-green-50"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
+                <div className="flex items-center gap-2">
+                  <FaConciergeBell className="w-5 h-5 text-green-300" />
+                  <span>
+                    <strong className="text-white">{data.totals.services}</strong>{" "}
+                    <span className="text-green-200">Services</span>
+                  </span>
+                </div>
+              </motion.div>
             )}
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Animal Categories Section */}
+      {data?.animalCategories?.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                Browse by Animal Type
+              </h2>
+              <p className="text-gray-500 mt-1">
+                Select a category to browse available livestock
+              </p>
+            </div>
+            <Link
+              href="/animals"
+              className="hidden sm:flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm"
+            >
+              View All Animals <FaArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {data.animalCategories.map((cat, i) => (
+              <motion.div
+                key={cat.species}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <Link
+                  href={`/animals?species=${encodeURIComponent(cat.species)}`}
+                  className="group block bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all p-5 text-center"
+                >
+                  {cat.image ? (
+                    <div className="w-20 h-20 mx-auto rounded-full overflow-hidden mb-3 border-2 border-gray-100 group-hover:border-green-400 transition-colors">
+                      <img
+                        src={cat.image}
+                        alt={cat.species}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-5xl mb-3">
+                      {speciesEmoji[cat.species] || "🐾"}
+                    </div>
+                  )}
+                  <h3 className="text-sm font-bold text-gray-900 group-hover:text-green-700 transition-colors">
+                    {cat.species}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {cat.count} available
+                  </p>
+                  <p className="text-xs text-green-600 font-medium mt-1">
+                    From {formatCurrency(cat.avgPrice, "NGN")}
+                  </p>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="sm:hidden mt-4 text-center">
+            <Link
+              href="/animals"
+              className="inline-flex items-center gap-2 text-green-600 font-medium text-sm"
+            >
+              View All Animals <FaArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Featured Animals */}
+      {data?.animals?.length > 0 && (
+        <section className="bg-gray-50 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  Featured Animals
+                </h2>
+                <p className="text-gray-500 mt-1">
+                  Latest livestock available for purchase
+                </p>
+              </div>
+              <Link
+                href="/animals"
+                className="hidden sm:flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm"
+              >
+                Browse All <FaArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+              {data.animals.slice(0, 6).map((animal, i) => (
+                <motion.div
+                  key={animal._id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <AnimalCard animal={animal} />
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center sm:hidden">
+              <Link
+                href="/animals"
+                className="inline-flex items-center gap-2 text-green-600 font-medium text-sm"
+              >
+                Browse All Animals <FaArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Farm Shop / Inventory Products */}
+      {data?.inventoryItems?.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                Farm Shop
+              </h2>
+              <p className="text-gray-500 mt-1">
+                Feed, medications, supplies, and equipment
+              </p>
+            </div>
+            <Link
+              href="/shop"
+              className="hidden sm:flex items-center gap-2 text-amber-600 hover:text-amber-700 font-medium text-sm"
+            >
+              View All Products <FaArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {data.inventoryItems.slice(0, 6).map((item, i) => (
+              <motion.div
+                key={item._id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <InventoryCard item={item} />
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-8 text-center sm:hidden">
+            <Link
+              href="/shop"
+              className="inline-flex items-center gap-2 text-amber-600 font-medium text-sm"
+            >
+              View All Products <FaArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Services Section */}
+      {data?.services?.length > 0 && (
+        <section className="bg-gray-50 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  Our Services
+                </h2>
+                <p className="text-gray-500 mt-1">
+                  Professional farm & veterinary services
+                </p>
+              </div>
+              <Link
+                href="/services"
+                className="hidden sm:flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium text-sm"
+              >
+                View All Services <FaArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {data.services.slice(0, 6).map((service, i) => (
+                <motion.div
+                  key={service._id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <ServiceCard service={service} />
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center sm:hidden">
+              <Link
+                href="/services"
+                className="inline-flex items-center gap-2 text-blue-600 font-medium text-sm"
+              >
+                View All Services <FaArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Trust Strip */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <FaCheckCircle className="w-7 h-7 text-green-500" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">
+                Verified & Healthy
+              </h3>
+              <p className="text-sm text-gray-500">
+                All animals are health-checked and come with records
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <FaTruck className="w-7 h-7 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">
+                Delivery Available
+              </h3>
+              <p className="text-sm text-gray-500">
+                We deliver animals and products to your location
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <FaShieldAlt className="w-7 h-7 text-purple-500" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">
+                Quality Guaranteed
+              </h3>
+              <p className="text-sm text-gray-500">
+                Backed by our farm's reputation and quality standards
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
     </StoreLayout>
   );
 }

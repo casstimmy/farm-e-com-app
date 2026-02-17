@@ -12,7 +12,16 @@ import {
   FaSignOutAlt,
   FaBoxOpen,
   FaChevronDown,
+  FaPaw,
+  FaConciergeBell,
+  FaStore,
 } from "react-icons/fa";
+
+const navLinks = [
+  { href: "/animals", label: "Animals", icon: FaPaw },
+  { href: "/shop", label: "Shop", icon: FaStore },
+  { href: "/services", label: "Services", icon: FaConciergeBell },
+];
 
 export default function StoreLayout({ children }) {
   const router = useRouter();
@@ -56,17 +65,39 @@ export default function StoreLayout({ children }) {
               </span>
             </Link>
 
+            {/* Desktop Nav Links */}
+            <nav className="hidden md:flex items-center gap-1 mx-6">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = router.pathname.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-green-50 text-green-700"
+                        : "text-gray-600 hover:text-green-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
             {/* Search bar */}
             <form
               onSubmit={handleSearch}
-              className="hidden md:flex flex-1 max-w-lg mx-8"
+              className="hidden lg:flex flex-1 max-w-sm ml-auto mr-4"
             >
               <div className="relative w-full">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search products..."
+                  placeholder="Search..."
                   className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                 />
                 <button
@@ -189,15 +220,35 @@ export default function StoreLayout({ children }) {
                 <Link
                   href="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-green-50 rounded-lg"
+                  className={`block px-3 py-2 text-sm font-medium rounded-lg ${
+                    router.pathname === "/" ? "bg-green-50 text-green-700" : "text-gray-700 hover:bg-green-50"
+                  }`}
                 >
-                  All Products
+                  Home
                 </Link>
+                {navLinks.map((link) => {
+                  const Icon = link.icon;
+                  const isActive = router.pathname.startsWith(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg ${
+                        isActive ? "bg-green-50 text-green-700" : "text-gray-700 hover:bg-green-50"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {link.label}
+                    </Link>
+                  );
+                })}
                 <Link
                   href="/cart"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-green-50 rounded-lg"
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-green-50 rounded-lg"
                 >
+                  <FaShoppingCart className="w-3.5 h-3.5" />
                   Cart ({cart.itemCount})
                 </Link>
               </nav>
@@ -233,8 +284,18 @@ export default function StoreLayout({ children }) {
               </h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="/" className="hover:text-green-400 transition-colors">
-                    Products
+                  <Link href="/animals" className="hover:text-green-400 transition-colors">
+                    Animals
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/shop" className="hover:text-green-400 transition-colors">
+                    Farm Shop
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/services" className="hover:text-green-400 transition-colors">
+                    Services
                   </Link>
                 </li>
                 <li>
