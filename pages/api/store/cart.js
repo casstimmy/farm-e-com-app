@@ -1,13 +1,52 @@
 import dbConnect from "@/lib/mongodb";
 import Cart from "@/models/Cart";
 import Product from "@/models/Product";
+import Inventory from "@/models/Inventory";
 import { withCustomerAuth } from "@/utils/customerAuth";
+
+/**
+ * Find or auto-create a Product for an inventory item.
+ * This bridges the Inventory-based shop pages with the Product-based cart.
+ */
+async function getOrCreateProductForInventory(inventoryId) {
+  // Check if a Product already exists for this inventory item
+  let product = await Product.findOne({ inventoryItem: inventoryId, isActive: true });
+  if (product) return product;
+
+  // Fetch the inventory item
+  const inv = await Inventory.findById(inventoryId);
+  if (!inv || !inv.showOnSite || inv.quantity <= 0) return null;
+
+  // Create slug from item name
+  const baseSlug = (inv.item || "product")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const slug = `${baseSlug}-${inv._id.toString().slice(-6)}`;
+
+  // Auto-create a Product linked to this inventory item
+  product = new Product({
+    name: inv.item,
+    slug,
+    inventoryItem: inv._id,
+    price: inv.salesPrice || inv.costPrice || 0,
+    costPrice: inv.costPrice || 0,
+    unit: inv.unit || "Unit",
+    trackInventory: true,
+    stockQuantity: inv.quantity,
+    isActive: true,
+    isFeatured: false,
+  });
+
+  await product.save();
+  return product;
+}
 
 /**
  * Customer cart endpoints.
  *
  * GET    /api/store/cart       — Get current cart with populated products
- * POST   /api/store/cart       — Add item to cart
+ * POST   /api/store/cart       — Add item to cart (accepts productId OR inventoryId)
  * PUT    /api/store/cart       — Update item quantity
  * DELETE /api/store/cart       — Remove item from cart
  */
@@ -78,15 +117,31 @@ async function handler(req, res) {
     }
   } else if (req.method === "POST") {
     try {
-      const { productId, quantity = 1 } = req.body;
+      const { productId, inventoryId, quantity = 1 } = req.body;
 
-      if (!productId) {
-        return res.status(400).json({ error: "Product ID is required" });
+      if (!productId && !inventoryId) {
+        return res.status(400).json({ error: "Product ID or Inventory ID is required" });
       }
 
-      const product = await Product.findById(productId);
-      if (!product || !product.isActive) {
-        return res.status(404).json({ error: "Product not available" });
+      let product;
+      if (inventoryId) {
+        // Auto-find or create a Product for this inventory item
+        product = await getOrCreateProductForInventory(inventoryId);
+        if (!product) {
+          return res.status(404).json({ error: "Product not available" });
+        }
+        // Sync stock from inventory
+        const inv = await Inventory.findById(inventoryId);
+        if (inv) {
+          product.stockQuantity = inv.quantity;
+          product.price = inv.salesPrice || inv.costPrice || product.price;
+          await product.save();
+        }
+      } else {
+        product = await Product.findById(productId);
+        if (!product || !product.isActive) {
+          return res.status(404).json({ error: "Product not available" });
+        }
       }
 
       const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);

@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import axios from "axios";
 import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
@@ -10,6 +9,10 @@ import ServiceCard from "@/components/store/ServiceCard";
 import ProductCard from "@/components/store/ProductCard";
 import { useStore } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/formatting";
+import dbConnect from "@/lib/mongodb";
+import Animal from "@/models/Animal";
+import Inventory from "@/models/Inventory";
+import Service from "@/models/Service";
 import {
   FaPaw,
   FaBoxOpen,
@@ -23,25 +26,55 @@ import {
   FaSearch,
 } from "react-icons/fa";
 
-export default function HomePage() {
-  const router = useRouter();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+export async function getServerSideProps() {
+  try {
+    await dbConnect();
+    const [animals, inventoryItems, services, animalStats] = await Promise.all([
+      Animal.find({ status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } })
+        .sort({ createdAt: -1 }).limit(6)
+        .populate("location", "name")
+        .select("tagId name species breed gender currentWeight projectedSalesPrice images location dob")
+        .lean(),
+      Inventory.find({ showOnSite: true, quantity: { $gt: 0 } })
+        .sort({ createdAt: -1 }).limit(6)
+        .select("item salesPrice price quantity unit categoryName").lean(),
+      Service.find({ showOnSite: true, isActive: true })
+        .sort({ createdAt: -1 }).limit(6).lean(),
+      Animal.aggregate([
+        { $match: { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } } },
+        { $group: { _id: "$species", count: { $sum: 1 }, avgPrice: { $avg: "$projectedSalesPrice" }, sample: { $first: "$images" } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+    const [totalAnimals, totalProducts, totalServices] = await Promise.all([
+      Animal.countDocuments({ status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } }),
+      Inventory.countDocuments({ showOnSite: true, quantity: { $gt: 0 } }),
+      Service.countDocuments({ showOnSite: true, isActive: true }),
+    ]);
+    return {
+      props: {
+        initialData: JSON.parse(JSON.stringify({
+          animals,
+          inventoryItems,
+          services,
+          animalCategories: animalStats.map((s) => ({
+            species: s._id, count: s.count, avgPrice: Math.round(s.avgPrice),
+            image: s.sample?.[0]?.thumb || s.sample?.[0]?.full || null,
+          })),
+          totals: { animals: totalAnimals, products: totalProducts, services: totalServices },
+        })),
+      },
+    };
+  } catch (error) {
+    console.error("Homepage SSR error:", error);
+    return { props: { initialData: null } };
+  }
+}
 
-  useEffect(() => {
-    async function fetchFeatured() {
-      try {
-        const { data: featured } = await axios.get("/api/store/featured");
-        setData(featured);
-      } catch (err) {
-        console.error("Failed to load homepage:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchFeatured();
-  }, []);
+export default function HomePage({ initialData }) {
+  const router = useRouter();
+  const [data] = useState(initialData);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -65,16 +98,6 @@ export default function HomePage() {
     Duck: "🦆",
     Horse: "🐴",
   };
-
-  if (loading) {
-    return (
-      <StoreLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <FaSpinner className="w-10 h-10 text-green-600 animate-spin" />
-        </div>
-      </StoreLayout>
-    );
-  }
 
   return (
     <StoreLayout>

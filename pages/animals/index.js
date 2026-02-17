@@ -4,6 +4,8 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
+import dbConnect from "@/lib/mongodb";
+import AnimalModel from "@/models/Animal";
 import {
   FaFilter,
   FaTimes,
@@ -13,39 +15,81 @@ import {
   FaSearch,
 } from "react-icons/fa";
 
+export async function getServerSideProps({ query }) {
+  try {
+    await dbConnect();
+    const { species, breed, gender, sort = "newest", search, page = 1, limit = 20 } = query;
+    const filter = { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } };
+    if (species) filter.species = { $regex: new RegExp(`^${species}$`, "i") };
+    if (breed) filter.breed = { $regex: new RegExp(breed, "i") };
+    if (gender) filter.gender = gender;
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      filter.$or = [{ name: searchRegex }, { tagId: searchRegex }, { breed: searchRegex }, { species: searchRegex }];
+    }
+    const sortMap = { newest: { createdAt: -1 }, price_asc: { projectedSalesPrice: 1 }, price_desc: { projectedSalesPrice: -1 }, weight_desc: { currentWeight: -1 }, name_asc: { name: 1 } };
+    const sortOption = sortMap[sort] || sortMap.newest;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * perPage;
+    const [animals, totalCount, speciesCounts] = await Promise.all([
+      AnimalModel.find(filter).sort(sortOption).skip(skip).limit(perPage)
+        .populate("location", "name city state")
+        .select("-purchaseCost -totalFeedCost -totalMedicationCost -marginPercent -sire -dam -recordedBy -isArchived -archivedAt -archivedReason")
+        .lean(),
+      AnimalModel.countDocuments(filter),
+      AnimalModel.aggregate([
+        { $match: { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } } },
+        { $group: { _id: "$species", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+    let breedCounts = [];
+    if (species) {
+      breedCounts = await AnimalModel.aggregate([
+        { $match: { species: { $regex: new RegExp(`^${species}$`, "i") }, status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } } },
+        { $group: { _id: "$breed", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]);
+    }
+    return {
+      props: {
+        initialAnimals: JSON.parse(JSON.stringify(animals)),
+        initialSpecies: speciesCounts.map((s) => ({ name: s._id, count: s.count })),
+        initialBreeds: breedCounts.map((b) => ({ name: b._id, count: b.count })),
+        initialPagination: { page: pageNum, limit: perPage, totalCount, totalPages: Math.ceil(totalCount / perPage), hasMore: pageNum * perPage < totalCount },
+        initialFilters: { species: species || "", breed: breed || "", gender: gender || "", sort: sort || "newest", search: search || "" },
+      },
+    };
+  } catch (error) {
+    console.error("Animals SSR error:", error);
+    return { props: { initialAnimals: [], initialSpecies: [], initialBreeds: [], initialPagination: {}, initialFilters: {} } };
+  }
+}
+
 /**
  * Animals Listing Page
  * /animals
- *
- * Displays all animals for sale, organized by species categories
- * with sub-categories for breed, and sorting options.
  */
-export default function AnimalsPage() {
+export default function AnimalsPage({ initialAnimals, initialSpecies, initialBreeds, initialPagination, initialFilters }) {
   const router = useRouter();
-  const [animals, setAnimals] = useState([]);
-  const [speciesCategories, setSpeciesCategories] = useState([]);
-  const [breedCategories, setBreedCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({});
+  const [animals, setAnimals] = useState(initialAnimals);
+  const [speciesCategories, setSpeciesCategories] = useState(initialSpecies);
+  const [breedCategories, setBreedCategories] = useState(initialBreeds);
+  const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState(initialPagination);
   const [showFilters, setShowFilters] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Filters
-  const [selectedSpecies, setSelectedSpecies] = useState("");
-  const [selectedBreed, setSelectedBreed] = useState("");
-  const [selectedGender, setSelectedGender] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Sync with URL query params
-  useEffect(() => {
-    if (router.query.species) setSelectedSpecies(router.query.species);
-    if (router.query.breed) setSelectedBreed(router.query.breed);
-    if (router.query.gender) setSelectedGender(router.query.gender);
-    if (router.query.sort) setSortBy(router.query.sort);
-    if (router.query.search) setSearchTerm(router.query.search);
-  }, [router.query]);
+  const [selectedSpecies, setSelectedSpecies] = useState(initialFilters.species || "");
+  const [selectedBreed, setSelectedBreed] = useState(initialFilters.breed || "");
+  const [selectedGender, setSelectedGender] = useState(initialFilters.gender || "");
+  const [sortBy, setSortBy] = useState(initialFilters.sort || "newest");
+  const [searchTerm, setSearchTerm] = useState(initialFilters.search || "");
 
   const fetchAnimals = useCallback(async () => {
+    if (!hasInteracted) return;
     setLoading(true);
     try {
       const params = {
@@ -68,13 +112,14 @@ export default function AnimalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSpecies, selectedBreed, selectedGender, sortBy, searchTerm, router.query.page]);
+  }, [selectedSpecies, selectedBreed, selectedGender, sortBy, searchTerm, router.query.page, hasInteracted]);
 
   useEffect(() => {
     fetchAnimals();
   }, [fetchAnimals]);
 
   const clearFilters = () => {
+    setHasInteracted(true);
     setSelectedSpecies("");
     setSelectedBreed("");
     setSelectedGender("");
@@ -84,8 +129,14 @@ export default function AnimalsPage() {
   };
 
   const handleSpeciesSelect = (species) => {
+    setHasInteracted(true);
     setSelectedSpecies(species);
     setSelectedBreed(""); // Reset breed when species changes
+  };
+
+  const handleFilterChange = (setter) => (val) => {
+    setHasInteracted(true);
+    setter(val);
   };
 
   const hasActiveFilters =
@@ -127,13 +178,13 @@ export default function AnimalsPage() {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleFilterChange(setSearchTerm)(e.target.value)}
               placeholder="Search by name, tag ID, breed, color..."
               className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm bg-white"
             />
             {searchTerm && (
               <button
-                onClick={() => setSearchTerm("")}
+                onClick={() => handleFilterChange(setSearchTerm)("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <FaTimes className="w-4 h-4" />
@@ -194,7 +245,7 @@ export default function AnimalsPage() {
                   <ul className="space-y-1">
                     <li>
                       <button
-                        onClick={() => setSelectedBreed("")}
+                        onClick={() => handleFilterChange(setSelectedBreed)("")}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                           !selectedBreed
                             ? "bg-emerald-50 text-emerald-700 font-medium"
@@ -207,7 +258,7 @@ export default function AnimalsPage() {
                     {breedCategories.map((b) => (
                       <li key={b.name}>
                         <button
-                          onClick={() => setSelectedBreed(b.name)}
+                          onClick={() => handleFilterChange(setSelectedBreed)(b.name)}
                           className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${
                             selectedBreed === b.name
                               ? "bg-emerald-50 text-emerald-700 font-medium"
@@ -232,7 +283,7 @@ export default function AnimalsPage() {
                   {["", "Male", "Female"].map((g) => (
                     <button
                       key={g}
-                      onClick={() => setSelectedGender(g)}
+                      onClick={() => handleFilterChange(setSelectedGender)(g)}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         selectedGender === g
                           ? "bg-green-600 text-white"
@@ -278,7 +329,7 @@ export default function AnimalsPage() {
                 <FaSortAmountDown className="w-3.5 h-3.5 text-gray-400" />
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={(e) => handleFilterChange(setSortBy)(e.target.value)}
                   className="text-sm border-none focus:ring-0 text-gray-700 font-medium bg-transparent cursor-pointer pr-8"
                 >
                   <option value="newest">Newest</option>
@@ -332,7 +383,7 @@ export default function AnimalsPage() {
                     <h4 className="text-sm font-semibold text-gray-900 mb-2">Breed</h4>
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => setSelectedBreed("")}
+                        onClick={() => handleFilterChange(setSelectedBreed)("")}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                           !selectedBreed
                             ? "bg-emerald-600 text-white"
@@ -344,7 +395,7 @@ export default function AnimalsPage() {
                       {breedCategories.map((b) => (
                         <button
                           key={b.name}
-                          onClick={() => setSelectedBreed(b.name)}
+                          onClick={() => handleFilterChange(setSelectedBreed)(b.name)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                             selectedBreed === b.name
                               ? "bg-emerald-600 text-white"
@@ -365,7 +416,7 @@ export default function AnimalsPage() {
                     {["", "Male", "Female"].map((g) => (
                       <button
                         key={g}
-                        onClick={() => setSelectedGender(g)}
+                        onClick={() => handleFilterChange(setSelectedGender)(g)}
                         className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
                           selectedGender === g
                             ? "bg-green-600 text-white"

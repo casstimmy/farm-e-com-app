@@ -1,21 +1,30 @@
+import { useState } from "react";
 import { useRouter } from "next/router";
 import StoreLayout from "@/components/store/StoreLayout";
 import InventoryCard from "@/components/store/InventoryCard";
+import { useStore } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/formatting";
 import {
   FaChevronLeft,
   FaBox,
-  FaWhatsapp,
+  FaShoppingCart,
+  FaMinus,
+  FaPlus,
   FaEnvelope,
   FaPhone,
   FaCheckCircle,
   FaTruck,
   FaShieldAlt,
   FaWarehouse,
+  FaSpinner,
 } from "react-icons/fa";
 
 export default function InventoryDetailPage({ item, relatedItems }) {
   const router = useRouter();
+  const { addToCart, isAuthenticated } = useStore();
+  const [quantity, setQuantity] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const [addedMsg, setAddedMsg] = useState("");
 
   if (!item) {
     return (
@@ -144,23 +153,79 @@ export default function InventoryDetailPage({ item, relatedItems }) {
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-auto flex gap-3">
-                <a
-                  href={`https://wa.me/?text=Hi, I want to order "${item.item}" (${formatCurrency(item.salesPrice || item.price, "NGN")}${item.unit ? ` per ${item.unit}` : ""}). Is it available?`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all shadow-sm hover:shadow-md"
-                >
-                  <FaWhatsapp className="w-5 h-5" />
-                  Order via WhatsApp
-                </a>
-                <a
-                  href={`mailto:store@farm.com?subject=Order: ${item.item}`}
-                  className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 px-4 rounded-lg transition-all"
-                >
-                  <FaEnvelope className="w-4 h-4" />
-                </a>
+              {/* Quantity Selector + Add to Cart */}
+              <div className="mt-auto space-y-3">
+                {isInStock && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600 font-medium">Qty:</span>
+                    <div className="flex items-center border border-gray-300 rounded-lg">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                        className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-30"
+                      >
+                        <FaMinus className="w-3 h-3" />
+                      </button>
+                      <span className="w-12 h-9 flex items-center justify-center text-sm font-bold border-x border-gray-300">
+                        {quantity}
+                      </span>
+                      <button
+                        onClick={() => setQuantity(Math.min(item.quantity, quantity + 1))}
+                        disabled={quantity >= item.quantity}
+                        className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-gray-700 disabled:opacity-30"
+                      >
+                        <FaPlus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={async () => {
+                      if (!isAuthenticated) {
+                        router.push(`/auth/login?redirect=/shop/${item._id}`);
+                        return;
+                      }
+                      setAdding(true);
+                      setAddedMsg("");
+                      try {
+                        await addToCart(null, quantity, item._id);
+                        setAddedMsg("Added to cart!");
+                        setTimeout(() => setAddedMsg(""), 3000);
+                      } catch (err) {
+                        setAddedMsg(err.response?.data?.error || err.message || "Failed");
+                      } finally {
+                        setAdding(false);
+                      }
+                    }}
+                    disabled={!isInStock || adding}
+                    className={`flex-1 flex items-center justify-center gap-2 font-semibold py-3 rounded-lg transition-all shadow-sm hover:shadow-md ${
+                      isInStock
+                        ? "bg-green-600 hover:bg-green-700 text-white"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {adding ? (
+                      <FaSpinner className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <FaShoppingCart className="w-5 h-5" />
+                    )}
+                    {adding ? "Adding..." : isInStock ? "Add to Cart" : "Out of Stock"}
+                  </button>
+                  <button
+                    onClick={() => router.push("/cart")}
+                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 px-4 rounded-lg transition-all"
+                  >
+                    <FaShoppingCart className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {addedMsg && (
+                  <p className={`text-sm font-medium ${addedMsg.includes("Added") ? "text-green-600" : "text-red-600"}`}>
+                    {addedMsg}
+                  </p>
+                )}
               </div>
             </div>
           </div>

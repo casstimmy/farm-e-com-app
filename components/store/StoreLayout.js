@@ -25,7 +25,7 @@ const navLinks = [
 
 export default function StoreLayout({ children }) {
   const router = useRouter();
-  const { customer, isAuthenticated, logout, cart } = useStore();
+  const { customer, isAuthenticated, logout, cart, businessSettings } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,11 +57,15 @@ export default function StoreLayout({ children }) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-9 h-9 bg-green-600 rounded-lg flex items-center justify-center">
-                <FaLeaf className="text-white w-5 h-5" />
-              </div>
+              {businessSettings?.businessLogo ? (
+                <img src={businessSettings.businessLogo} alt={businessSettings.businessName || "Logo"} className="w-9 h-9 rounded-lg object-contain" />
+              ) : (
+                <div className="w-9 h-9 bg-green-600 rounded-lg flex items-center justify-center">
+                  <FaLeaf className="text-white w-5 h-5" />
+                </div>
+              )}
               <span className="text-xl font-bold text-gray-900 hidden sm:block">
-                {process.env.NEXT_PUBLIC_APP_NAME || "Farm Store"}
+                {businessSettings?.businessName || process.env.NEXT_PUBLIC_APP_NAME || "Farm Store"}
               </span>
             </Link>
 
@@ -266,16 +270,19 @@ export default function StoreLayout({ children }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                  <FaLeaf className="text-white w-4 h-4" />
-                </div>
+                {businessSettings?.businessLogo ? (
+                  <img src={businessSettings.businessLogo} alt="" className="w-8 h-8 rounded-lg object-contain" />
+                ) : (
+                  <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+                    <FaLeaf className="text-white w-4 h-4" />
+                  </div>
+                )}
                 <span className="text-lg font-bold text-white">
-                  {process.env.NEXT_PUBLIC_APP_NAME || "Farm Store"}
+                  {businessSettings?.businessName || process.env.NEXT_PUBLIC_APP_NAME || "Farm Store"}
                 </span>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Quality farm products, livestock feed, medications, and services
-                — direct from the farm to your door.
+                {businessSettings?.businessDescription || "Quality farm products, livestock feed, medications, and services — direct from the farm to your door."}
               </p>
             </div>
             <div>
@@ -315,13 +322,17 @@ export default function StoreLayout({ children }) {
                 Contact
               </h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li>Email: store@farm.com</li>
-                <li>Phone: +0905 858 9953</li>
+                {businessSettings?.businessEmail && <li>Email: {businessSettings.businessEmail}</li>}
+                {businessSettings?.businessPhone && <li>Phone: {businessSettings.businessPhone}</li>}
+                {businessSettings?.businessAddress && <li>Address: {businessSettings.businessAddress}</li>}
+                {!businessSettings?.businessEmail && !businessSettings?.businessPhone && (
+                  <li className="text-gray-500">Contact info not configured</li>
+                )}
               </ul>
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME || "Farm Store"}. All rights reserved.
+            &copy; {new Date().getFullYear()} {businessSettings?.businessName || process.env.NEXT_PUBLIC_APP_NAME || "Farm Store"}. All rights reserved.
           </div>
         </div>
       </footer>

@@ -14,6 +14,11 @@ import {
   FaSpinner,
   FaSave,
   FaReceipt,
+  FaChartBar,
+  FaShoppingBag,
+  FaMoneyBillWave,
+  FaClock,
+  FaBoxOpen,
 } from "react-icons/fa";
 
 export default function AccountPage() {
@@ -22,8 +27,9 @@ export default function AccountPage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [dashboardData, setDashboardData] = useState(null);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -40,10 +46,26 @@ export default function AccountPage() {
 
   const fetchProfile = async () => {
     try {
-      const { data } = await axios.get("/api/store/account", {
-        headers: getAuthHeaders(),
+      const headers = getAuthHeaders();
+      const [profileRes, ordersRes] = await Promise.all([
+        axios.get("/api/store/account", { headers }),
+        axios.get("/api/store/orders?limit=50", { headers }).catch(() => ({ data: { orders: [] } })),
+      ]);
+      setProfile(profileRes.data.customer);
+      
+      // Build dashboard data from orders
+      const orders = ordersRes.data.orders || [];
+      const totalSpent = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const totalItems = orders.reduce((sum, o) => sum + (o.items?.length || 0), 0);
+      const statusCounts = {};
+      orders.forEach(o => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
+      setDashboardData({
+        totalOrders: orders.length,
+        totalSpent,
+        totalItems,
+        statusCounts,
+        recentOrders: orders.slice(0, 5),
       });
-      setProfile(data.customer);
     } catch (err) {
       console.error("Failed to fetch profile", err);
     } finally {
@@ -152,6 +174,7 @@ export default function AccountPage() {
   };
 
   const tabs = [
+    { id: "dashboard", label: "Dashboard", icon: <FaChartBar className="w-4 h-4" /> },
     { id: "profile", label: "Profile", icon: <FaUser className="w-4 h-4" /> },
     {
       id: "addresses",
@@ -164,6 +187,14 @@ export default function AccountPage() {
       icon: <FaLock className="w-4 h-4" />,
     },
   ];
+
+  const formatCurrency = (val) =>
+    new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 }).format(val || 0);
+
+  const statusColor = (s) => {
+    const map = { pending: "bg-yellow-100 text-yellow-700", processing: "bg-blue-100 text-blue-700", shipped: "bg-indigo-100 text-indigo-700", delivered: "bg-green-100 text-green-700", cancelled: "bg-red-100 text-red-700" };
+    return map[s] || "bg-gray-100 text-gray-700";
+  };
 
   if (loading || authLoading) {
     return (
@@ -223,6 +254,98 @@ export default function AccountPage() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-6">
+          {/* Dashboard Tab */}
+          {activeTab === "dashboard" && dashboardData && (
+            <div className="space-y-6">
+              {/* Welcome */}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Welcome back, {profile?.firstName || "Customer"}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Here&apos;s a summary of your account activity.</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+                  <FaShoppingBag className="w-5 h-5 text-green-600 mb-2" />
+                  <p className="text-2xl font-bold text-gray-900">{dashboardData.totalOrders}</p>
+                  <p className="text-xs text-gray-500">Total Orders</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <FaMoneyBillWave className="w-5 h-5 text-blue-600 mb-2" />
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(dashboardData.totalSpent)}</p>
+                  <p className="text-xs text-gray-500">Total Spent</p>
+                </div>
+                <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
+                  <FaBoxOpen className="w-5 h-5 text-purple-600 mb-2" />
+                  <p className="text-2xl font-bold text-gray-900">{dashboardData.totalItems}</p>
+                  <p className="text-xs text-gray-500">Items Ordered</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <FaClock className="w-5 h-5 text-amber-600 mb-2" />
+                  <p className="text-2xl font-bold text-gray-900">{dashboardData.statusCounts?.pending || 0}</p>
+                  <p className="text-xs text-gray-500">Pending Orders</p>
+                </div>
+              </div>
+
+              {/* Order Status Breakdown */}
+              {dashboardData.totalOrders > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Order Status Breakdown</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(dashboardData.statusCounts).map(([status, count]) => (
+                      <span key={status} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium capitalize ${statusColor(status)}`}>
+                        {status} <span className="font-bold">{count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Orders */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">Recent Orders</h3>
+                  <button onClick={() => router.push("/account/orders")} className="text-xs text-green-600 hover:text-green-700 font-medium">View All</button>
+                </div>
+                {dashboardData.recentOrders.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <FaShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No orders yet</p>
+                    <button onClick={() => router.push("/shop")} className="mt-3 text-sm text-green-600 hover:text-green-700 font-medium">Start Shopping</button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {dashboardData.recentOrders.map((order) => (
+                      <div key={order._id} className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors" onClick={() => router.push(`/account/orders?id=${order._id}`)}>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">#{order.orderNumber}</p>
+                          <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(order.total)}</p>
+                          <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${statusColor(order.status)}`}>{order.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                <button onClick={() => router.push("/shop")} className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  <FaShoppingBag className="w-4 h-4 text-green-600" /> Browse Shop
+                </button>
+                <button onClick={() => router.push("/account/orders")} className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  <FaReceipt className="w-4 h-4 text-blue-600" /> My Orders
+                </button>
+                <button onClick={() => setActiveTab("profile")} className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  <FaUser className="w-4 h-4 text-purple-600" /> Edit Profile
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Profile Tab */}
           {activeTab === "profile" && profile && (
             <form onSubmit={handleSaveProfile} className="space-y-4 max-w-lg">

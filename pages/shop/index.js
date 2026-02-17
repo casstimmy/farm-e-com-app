@@ -4,6 +4,9 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import InventoryCard from "@/components/store/InventoryCard";
+import dbConnect from "@/lib/mongodb";
+import Inventory from "@/models/Inventory";
+import InventoryCategory from "@/models/InventoryCategory";
 import {
   FaFilter,
   FaTimes,
@@ -13,32 +16,66 @@ import {
   FaSearch,
 } from "react-icons/fa";
 
+export async function getServerSideProps({ query }) {
+  try {
+    await dbConnect();
+    const { category, search, sort = "newest", page = 1, limit = 20 } = query;
+    const filter = { showOnSite: true, quantity: { $gt: 0 } };
+    if (category) filter.categoryId = category;
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      filter.$or = [{ item: searchRegex }, { category: searchRegex }, { categoryName: searchRegex }];
+    }
+    const sortMap = { newest: { createdAt: -1 }, price_asc: { salesPrice: 1 }, price_desc: { salesPrice: -1 }, name_asc: { item: 1 } };
+    const sortOption = sortMap[sort] || sortMap.newest;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * perPage;
+    const [items, totalCount, categories, categoryCounts] = await Promise.all([
+      Inventory.find(filter).sort(sortOption).skip(skip).limit(perPage).populate("categoryId", "name description").select("-costPrice -marginPercent -totalConsumed -minStock -medication").lean(),
+      Inventory.countDocuments(filter),
+      InventoryCategory.find().sort({ name: 1 }).lean(),
+      Inventory.aggregate([
+        { $match: { showOnSite: true, quantity: { $gt: 0 } } },
+        { $group: { _id: "$categoryId", count: { $sum: 1 }, categoryName: { $first: "$categoryName" } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+    return {
+      props: {
+        initialItems: JSON.parse(JSON.stringify(items)),
+        initialCategories: JSON.parse(JSON.stringify(categoryCounts.map((c) => ({ _id: c._id, name: c.categoryName || "Uncategorized", count: c.count })))),
+        initialPagination: { page: pageNum, limit: perPage, totalCount, totalPages: Math.ceil(totalCount / perPage), hasMore: pageNum * perPage < totalCount },
+        initialFilters: { category: category || "", search: search || "", sort: sort || "newest" },
+      },
+    };
+  } catch (error) {
+    console.error("Shop SSR error:", error);
+    return { props: { initialItems: [], initialCategories: [], initialPagination: {}, initialFilters: {} } };
+  }
+}
+
 /**
  * Inventory Products (Shop) Listing Page
  * /shop
- *
- * Displays inventory items marked showOnSite.
- * Filterable by category and sortable.
  */
-export default function ShopPage() {
+export default function ShopPage({ initialItems, initialCategories, initialPagination, initialFilters }) {
   const router = useRouter();
-  const [items, setItems] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({});
+  const [items, setItems] = useState(initialItems);
+  const [categories, setCategories] = useState(initialCategories);
+  const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState(initialPagination);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(initialFilters.category || "");
+  const [sortBy, setSortBy] = useState(initialFilters.sort || "newest");
+  const [searchTerm, setSearchTerm] = useState(initialFilters.search || "");
 
-  useEffect(() => {
-    if (router.query.category) setSelectedCategory(router.query.category);
-    if (router.query.sort) setSortBy(router.query.sort);
-    if (router.query.search) setSearchTerm(router.query.search);
-  }, [router.query]);
+  // Track if this is the initial render (SSR data already loaded)
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const fetchItems = useCallback(async () => {
+    if (!hasInteracted) return; // Skip fetch on initial load — SSR data is already present
     setLoading(true);
     try {
       const params = {
@@ -58,17 +95,33 @@ export default function ShopPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, sortBy, searchTerm, router.query.page]);
+  }, [selectedCategory, sortBy, searchTerm, router.query.page, hasInteracted]);
 
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
 
   const clearFilters = () => {
+    setHasInteracted(true);
     setSelectedCategory("");
     setSortBy("newest");
     setSearchTerm("");
     router.push("/shop", undefined, { shallow: true });
+  };
+
+  const handleCategoryChange = (cat) => {
+    setHasInteracted(true);
+    setSelectedCategory(cat);
+  };
+
+  const handleSortChange = (val) => {
+    setHasInteracted(true);
+    setSortBy(val);
+  };
+
+  const handleSearchChange = (val) => {
+    setHasInteracted(true);
+    setSearchTerm(val);
   };
 
   const hasActiveFilters = selectedCategory || searchTerm || sortBy !== "newest";
@@ -99,13 +152,13 @@ export default function ShopPage() {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search farm supplies..."
               className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm bg-white"
             />
             {searchTerm && (
               <button
-                onClick={() => setSearchTerm("")}
+                onClick={() => handleSearchChange("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <FaTimes className="w-4 h-4" />
@@ -124,7 +177,7 @@ export default function ShopPage() {
               <ul className="space-y-1">
                 <li>
                   <button
-                    onClick={() => setSelectedCategory("")}
+                    onClick={() => handleCategoryChange("")}
                     className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
                       !selectedCategory
                         ? "bg-amber-50 text-amber-700 font-medium"
@@ -137,7 +190,7 @@ export default function ShopPage() {
                 {categories.map((cat) => (
                   <li key={cat._id || cat.name}>
                     <button
-                      onClick={() => setSelectedCategory(cat._id)}
+                      onClick={() => handleCategoryChange(cat._id)}
                       className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between ${
                         selectedCategory === cat._id
                           ? "bg-amber-50 text-amber-700 font-medium"
@@ -185,7 +238,7 @@ export default function ShopPage() {
                 <FaSortAmountDown className="w-3.5 h-3.5 text-gray-400" />
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={(e) => handleSortChange(e.target.value)}
                   className="text-sm border-none focus:ring-0 text-gray-700 font-medium bg-transparent cursor-pointer pr-8"
                 >
                   <option value="newest">Newest</option>
@@ -204,7 +257,7 @@ export default function ShopPage() {
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setSelectedCategory("")}
+                    onClick={() => handleCategoryChange("")}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                       !selectedCategory
                         ? "bg-amber-600 text-white"
@@ -216,7 +269,7 @@ export default function ShopPage() {
                   {categories.map((cat) => (
                     <button
                       key={cat._id || cat.name}
-                      onClick={() => setSelectedCategory(cat._id)}
+                      onClick={() => handleCategoryChange(cat._id)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                         selectedCategory === cat._id
                           ? "bg-amber-600 text-white"

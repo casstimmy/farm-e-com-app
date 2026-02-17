@@ -16,6 +16,7 @@ export function StoreProvider({ children }) {
   const [cart, setCart] = useState({ items: [], itemCount: 0, subtotal: 0 });
   const [cartLoading, setCartLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [businessSettings, setBusinessSettings] = useState(null);
   const fetchingCart = useRef(false);
 
   // Initialize from localStorage
@@ -32,6 +33,11 @@ export function StoreProvider({ children }) {
       }
     }
     setAuthLoading(false);
+
+    // Fetch business settings (public, no auth needed)
+    axios.get("/api/store/settings")
+      .then(({ data }) => setBusinessSettings(data))
+      .catch(() => {});
   }, []);
 
   // Fetch cart when customer changes
@@ -95,14 +101,21 @@ export function StoreProvider({ children }) {
   }, [getAuthHeaders]);
 
   const addToCart = useCallback(
-    async (productId, quantity = 1) => {
+    async (productId, quantity = 1, inventoryId = null) => {
       if (!customer) {
         throw new Error("Please log in to add items to your cart");
       }
 
+      const body = { quantity };
+      if (inventoryId) {
+        body.inventoryId = inventoryId;
+      } else {
+        body.productId = productId;
+      }
+
       const { data } = await axios.post(
         "/api/store/cart",
-        { productId, quantity },
+        body,
         { headers: getAuthHeaders() }
       );
 
@@ -152,6 +165,9 @@ export function StoreProvider({ children }) {
     register,
     logout,
     getAuthHeaders,
+
+    // Business Settings
+    businessSettings,
 
     // Cart
     cart,

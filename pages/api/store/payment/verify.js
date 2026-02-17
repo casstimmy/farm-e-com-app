@@ -1,4 +1,5 @@
 import dbConnect from "@/lib/mongodb";
+import Order from "@/models/Order";
 import { verifyPayment } from "@/services/paymentService";
 
 /**
@@ -21,11 +22,17 @@ export default async function handler(req, res) {
   try {
     const result = await verifyPayment(reference);
 
+    // Fetch the full order for the response
+    const orderId = result.transaction?.order;
+    const order = orderId
+      ? await Order.findById(orderId).select("orderNumber total status paymentStatus createdAt").lean()
+      : null;
+
     if (result.alreadyVerified) {
       return res.status(200).json({
         status: "success",
         message: "Payment already verified",
-        orderId: result.transaction.order,
+        order,
       });
     }
 
@@ -33,14 +40,14 @@ export default async function handler(req, res) {
       return res.status(200).json({
         status: "success",
         message: "Payment verified successfully",
-        orderId: result.transaction.order,
+        order,
       });
     }
 
     return res.status(400).json({
       status: "failed",
       message: result.reason || "Payment verification failed",
-      orderId: result.transaction?.order,
+      order,
     });
   } catch (error) {
     console.error("Payment verification error:", error);
