@@ -17,18 +17,22 @@ async function handler(req, res) {
 
   try {
     const customerId = req.customer.id;
-    const { id, page = 1, limit = 10 } = req.query;
+    const { id, order: orderNumber, page = 1, limit = 10 } = req.query;
 
-    if (id) {
-      const order = await Order.findOne({ _id: id, customer: customerId })
+    if (id || orderNumber) {
+      const findQuery = { customer: customerId };
+      if (id) findQuery._id = id;
+      if (orderNumber) findQuery.orderNumber = orderNumber;
+
+      const orderDoc = await Order.findOne(findQuery)
         .populate("items.product", "name slug images")
         .lean();
 
-      if (!order) {
+      if (!orderDoc) {
         return res.status(404).json({ error: "Order not found" });
       }
 
-      return res.status(200).json(order);
+      return res.status(200).json(orderDoc);
     }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
