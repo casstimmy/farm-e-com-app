@@ -2,6 +2,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useStore } from "@/context/StoreContext";
+import { formatCurrency } from "@/utils/formatting";
 import {
   FaShoppingCart,
   FaUser,
@@ -15,6 +16,7 @@ import {
   FaPaw,
   FaConciergeBell,
   FaStore,
+  FaArrowRight,
 } from "react-icons/fa";
 
 const navLinks = [
@@ -28,6 +30,7 @@ export default function StoreLayout({ children }) {
   const { customer, isAuthenticated, logout, cart, businessSettings } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [cartMenuOpen, setCartMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = (e) => {
@@ -116,17 +119,102 @@ export default function StoreLayout({ children }) {
             {/* Right actions */}
             <div className="flex items-center gap-3">
               {/* Cart */}
-              <Link
-                href="/cart"
-                className="relative p-2 text-gray-600 hover:text-green-600 transition-colors"
-              >
-                <FaShoppingCart className="w-5 h-5" />
-                {cart.itemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {cart.itemCount > 9 ? "9+" : cart.itemCount}
-                  </span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCartMenuOpen(!cartMenuOpen)}
+                  className="relative p-2 text-gray-600 hover:text-green-600 transition-colors"
+                >
+                  <FaShoppingCart className="w-5 h-5" />
+                  {cart.itemCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                      {cart.itemCount > 9 ? "9+" : cart.itemCount}
+                    </span>
+                  )}
+                </button>
+
+                {cartMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setCartMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          Cart ({cart.itemCount})
+                        </h3>
+                      </div>
+
+                      {!isAuthenticated ? (
+                        <div className="p-4">
+                          <p className="text-sm text-gray-600 mb-3">Sign in to see your cart items.</p>
+                          <Link
+                            href={`/auth/login?redirect=${encodeURIComponent(router.asPath || "/")}`}
+                            onClick={() => setCartMenuOpen(false)}
+                            className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800"
+                          >
+                            Sign In <FaArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      ) : cart.items?.length > 0 ? (
+                        <>
+                          <div className="max-h-72 overflow-y-auto p-2">
+                            {cart.items.slice(0, 5).map((item) => (
+                              <Link
+                                key={item._id}
+                                href="/cart"
+                                onClick={() => setCartMenuOpen(false)}
+                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                <div className="w-11 h-11 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                                  {item.product?.images?.[0]?.url ? (
+                                    <img src={item.product.images[0].url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">
+                                      item
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-gray-800 truncate">
+                                    {item.product?.name || "Product"}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Qty: {item.quantity}
+                                  </p>
+                                </div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {formatCurrency((item.price || 0) * (item.quantity || 0), "NGN")}
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                            <div className="flex items-center justify-between text-sm mb-3">
+                              <span className="text-gray-600">Subtotal</span>
+                              <span className="font-semibold text-gray-900">
+                                {formatCurrency(cart.subtotal || 0, "NGN")}
+                              </span>
+                            </div>
+                            <Link
+                              href="/cart"
+                              onClick={() => setCartMenuOpen(false)}
+                              className="w-full inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
+                            >
+                              View Cart
+                            </Link>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="p-4 text-sm text-gray-500">
+                          Your cart is empty.
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
-              </Link>
+              </div>
 
               {/* User menu */}
               {isAuthenticated ? (

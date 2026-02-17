@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { useState } from "react";
 import { formatCurrency } from "@/utils/formatting";
-import { FaWeight, FaVenusMars, FaPaw, FaMapMarkerAlt } from "react-icons/fa";
+import { FaWeight, FaVenusMars, FaPaw, FaMapMarkerAlt, FaShoppingCart, FaSpinner } from "react-icons/fa";
 
 /**
  * AnimalCard — Rich product card for livestock listings.
  * Displays image, species badge, breed, gender, weight, price, location.
  */
-export default function AnimalCard({ animal, currency = "NGN" }) {
+export default function AnimalCard({ animal, currency = "NGN", onAddToCart = null }) {
+  const [adding, setAdding] = useState(false);
   const primaryImage =
     animal.images?.[0]?.thumb || animal.images?.[0]?.full || null;
 
@@ -50,6 +52,16 @@ export default function AnimalCard({ animal, currency = "NGN" }) {
     animal.gender === "Male"
       ? "text-blue-600 bg-blue-50"
       : "text-pink-600 bg-pink-50";
+
+  const handleAddClick = async () => {
+    if (!onAddToCart || adding) return;
+    setAdding(true);
+    try {
+      await onAddToCart(animal);
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
     <div className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col">
@@ -147,13 +159,33 @@ export default function AnimalCard({ animal, currency = "NGN" }) {
             </span>
           </div>
 
-          {/* View Details Button */}
-          <Link
-            href={`/animals/${animal._id}`}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
-          >
-            View Details
-          </Link>
+          {/* Action Buttons */}
+          {onAddToCart ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleAddClick}
+                disabled={adding}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-60"
+              >
+                {adding ? <FaSpinner className="w-4 h-4 animate-spin" /> : <FaShoppingCart className="w-4 h-4" />}
+                {adding ? "Adding..." : "Add to Cart"}
+              </button>
+              <Link
+                href={`/animals/${animal._id}`}
+                className="w-full flex items-center justify-center py-2 rounded-lg text-xs font-medium text-green-700 hover:bg-green-50 transition-colors"
+              >
+                View Details
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href={`/animals/${animal._id}`}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+            >
+              View Details
+            </Link>
+          )}
         </div>
       </div>
     </div>

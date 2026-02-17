@@ -138,6 +138,21 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
     },
   ].filter((item) => item.value);
 
+  const handleDirectAddToCart = async (animalItem) => {
+    if (!isAuthenticated) {
+      router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath || `/animals/${animal._id}`)}`);
+      return;
+    }
+    try {
+      await addToCart(null, 1, null, { animalId: animalItem._id });
+      setNotice("Animal added to cart");
+      setTimeout(() => setNotice(""), 2200);
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Failed to add to cart");
+      setTimeout(() => setNotice(""), 2600);
+    }
+  };
+
   return (
     <StoreLayout>
       {notice && (
@@ -394,7 +409,7 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
               {relatedAnimals.map((a) => (
-                <AnimalCard key={a._id} animal={a} />
+                <AnimalCard key={a._id} animal={a} onAddToCart={handleDirectAddToCart} />
               ))}
             </div>
           </div>

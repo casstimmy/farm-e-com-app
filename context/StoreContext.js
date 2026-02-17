@@ -109,7 +109,7 @@ export function StoreProvider({ children }) {
       const body = { quantity };
       if (inventoryId) {
         body.inventoryId = inventoryId;
-      } else {
+      } else if (productId) {
         body.productId = productId;
       }
       if (extra && typeof extra === "object") {

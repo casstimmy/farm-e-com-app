@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
 import StoreLayout from "@/components/store/StoreLayout";
@@ -29,21 +29,43 @@ export default function CheckoutPage() {
   });
   const [notes, setNotes] = useState("");
 
-  // Load saved address
+  const applyDefaultAddress = useCallback((profile) => {
+    if (!profile) return false;
+    const defaultAddr = profile.addresses?.find((a) => a.isDefault) || profile.addresses?.[0];
+    if (!defaultAddr) return false;
+
+    setShippingAddress({
+      street: defaultAddr.street || "",
+      city: defaultAddr.city || "",
+      state: defaultAddr.state || "",
+      postalCode: defaultAddr.postalCode || "",
+      country: defaultAddr.country || "Nigeria",
+    });
+    return true;
+  }, []);
+
+  // Load saved address from local profile, then refresh from account API.
   useEffect(() => {
-    if (customer) {
-      const defaultAddr = customer.addresses?.find((a) => a.isDefault) || customer.addresses?.[0];
-      if (defaultAddr) {
-        setShippingAddress({
-          street: defaultAddr.street || "",
-          city: defaultAddr.city || "",
-          state: defaultAddr.state || "",
-          postalCode: defaultAddr.postalCode || "",
-          country: defaultAddr.country || "Nigeria",
-        });
-      }
-    }
-  }, [customer]);
+    if (!customer || !isAuthenticated) return;
+
+    const t = setTimeout(() => {
+      const hydrated = applyDefaultAddress(customer);
+      if (hydrated) return;
+
+      axios
+        .get("/api/store/account", { headers: getAuthHeaders() })
+        .then(({ data }) => {
+          const profile = data?.customer || data;
+          if (!profile) return;
+          applyDefaultAddress(profile);
+          const existing = JSON.parse(localStorage.getItem("storeCustomer") || "{}");
+          localStorage.setItem("storeCustomer", JSON.stringify({ ...existing, ...profile }));
+        })
+        .catch(() => {});
+    }, 0);
+
+    return () => clearTimeout(t);
+  }, [customer, isAuthenticated, getAuthHeaders, applyDefaultAddress]);
 
   useEffect(() => {
     if (!isAuthenticated) {

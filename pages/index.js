@@ -75,6 +75,21 @@ export default function HomePage({ initialData }) {
     }
   };
 
+  const handleHomeAnimalAddToCart = async (animal) => {
+    if (!isAuthenticated) {
+      router.push(`/auth/login?redirect=${encodeURIComponent("/")}`);
+      return;
+    }
+    try {
+      await addToCart(null, 1, null, { animalId: animal._id });
+      setNotice(`${animal.name || animal.tagId || "Animal"} added to cart`);
+      setTimeout(() => setNotice(""), 2200);
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Failed to add to cart");
+      setTimeout(() => setNotice(""), 2600);
+    }
+  };
+
   // Species emoji/icon mapping
   const speciesEmoji = {
     Goat: "🐐",
@@ -285,7 +300,7 @@ export default function HomePage({ initialData }) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <AnimalCard animal={animal} />
+                  <AnimalCard animal={animal} onAddToCart={handleHomeAnimalAddToCart} />
                 </motion.div>
               ))}
             </div>

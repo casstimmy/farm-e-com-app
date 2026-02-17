@@ -4,6 +4,7 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
+import { useStore } from "@/context/StoreContext";
 import dbConnect from "@/lib/mongodb";
 import AnimalModel from "@/models/Animal";
 import {
@@ -73,12 +74,14 @@ export async function getServerSideProps({ query }) {
  */
 export default function AnimalsPage({ initialAnimals, initialSpecies, initialBreeds, initialPagination, initialFilters }) {
   const router = useRouter();
+  const { addToCart, isAuthenticated } = useStore();
   const [animals, setAnimals] = useState(initialAnimals);
   const [speciesCategories, setSpeciesCategories] = useState(initialSpecies);
   const [breedCategories, setBreedCategories] = useState(initialBreeds);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState(initialPagination);
   const [showFilters, setShowFilters] = useState(false);
+  const [notice, setNotice] = useState("");
   const [hasInteracted, setHasInteracted] = useState(
     (initialAnimals?.length || 0) === 0
   );
@@ -146,8 +149,29 @@ export default function AnimalsPage({ initialAnimals, initialSpecies, initialBre
 
   const totalAnimals = speciesCategories.reduce((sum, s) => sum + s.count, 0);
 
+  const handleDirectAddToCart = async (animal) => {
+    if (!isAuthenticated) {
+      router.push(`/auth/login?redirect=${encodeURIComponent(router.asPath || "/animals")}`);
+      return;
+    }
+
+    try {
+      await addToCart(null, 1, null, { animalId: animal._id });
+      setNotice(`${animal.name || animal.tagId || "Animal"} added to cart`);
+      setTimeout(() => setNotice(""), 2200);
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Failed to add to cart");
+      setTimeout(() => setNotice(""), 2600);
+    }
+  };
+
   return (
     <StoreLayout>
+      {notice && (
+        <div className="fixed top-20 right-4 z-50 bg-green-600 text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium">
+          {notice}
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-green-700 to-emerald-600 rounded-2xl p-8 mb-8 text-white">
@@ -468,7 +492,7 @@ export default function AnimalsPage({ initialAnimals, initialSpecies, initialBre
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <AnimalCard animal={animal} />
+                      <AnimalCard animal={animal} onAddToCart={handleDirectAddToCart} />
                     </motion.div>
                   ))}
                 </div>
