@@ -18,7 +18,7 @@ async function handler(req, res) {
 
   try {
     const settings = await BusinessSettings.findOne()
-      .select("businessName businessLogo businessEmail businessPhone businessAddress businessDescription currency")
+      .select("businessName businessLogo businessEmail businessPhone businessAddress businessDescription loginHeroImage currency")
       .lean();
 
     // Cache for 5 minutes
@@ -31,6 +31,7 @@ async function handler(req, res) {
       businessPhone: "",
       businessAddress: "",
       businessDescription: "",
+      loginHeroImage: "",
       currency: "NGN",
     });
   } catch (error) {
