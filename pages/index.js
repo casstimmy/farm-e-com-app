@@ -48,7 +48,7 @@ export async function getStaticProps() {
 
 export default function HomePage({ initialData }) {
   const router = useRouter();
-  const { addToCart, isAuthenticated } = useStore();
+  const { addToCart, isAuthenticated, businessSettings } = useStore();
   const [data] = useState(initialData);
   const [searchQuery, setSearchQuery] = useState("");
   const [notice, setNotice] = useState("");
@@ -115,6 +115,13 @@ export default function HomePage({ initialData }) {
       )}
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-green-800 via-green-700 to-emerald-600 text-white overflow-hidden">
+        {businessSettings?.loginHeroImage && (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${businessSettings.loginHeroImage})` }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900/80 via-green-800/75 to-emerald-700/70" />
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl" />
           <div className="absolute bottom-10 right-10 w-96 h-96 bg-green-300 rounded-full blur-3xl" />
