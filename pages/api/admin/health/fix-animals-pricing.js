@@ -110,7 +110,7 @@ async function handler(req, res) {
       const bulkOps = updates.map((update) => ({
         updateOne: {
           filter: { _id: update.id },
-          update: { $set: { projectedSalesPrice: update.newPrice } },
+          update: { $set: { projectedSalesPrice: update.newPrice, salesPrice: update.newPrice } },
         },
       }));
 

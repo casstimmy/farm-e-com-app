@@ -29,7 +29,7 @@ async function handler(req, res) {
       _id: id,
       status: "Alive",
       isArchived: { $ne: true },
-      projectedSalesPrice: { $gt: 0 },
+      $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
     })
       .populate("location", "name city state address")
       .select("-purchaseCost -totalFeedCost -totalMedicationCost -marginPercent -sire -dam -recordedBy -isArchived -archivedAt -archivedReason")
@@ -57,11 +57,11 @@ async function handler(req, res) {
       species: animal.species,
       status: "Alive",
       isArchived: { $ne: true },
-      projectedSalesPrice: { $gt: 0 },
+      $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
     })
       .limit(4)
       .populate("location", "name")
-      .select("tagId name species breed gender currentWeight projectedSalesPrice images")
+      .select("tagId name species breed gender currentWeight salesPrice projectedSalesPrice images")
       .lean();
 
     res.setHeader(

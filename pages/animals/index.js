@@ -21,7 +21,7 @@ export async function getServerSideProps({ query }) {
     await import("@/models/Location");
     await dbConnect();
     const { species, breed, gender, sort = "newest", search, page = 1, limit = 20 } = query;
-    const filter = { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } };
+    const filter = { status: "Alive", isArchived: { $ne: true }, $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] };
     if (species) filter.species = { $regex: new RegExp(`^${species}$`, "i") };
     if (breed) filter.breed = { $regex: new RegExp(breed, "i") };
     if (gender) filter.gender = gender;
@@ -41,13 +41,13 @@ export async function getServerSideProps({ query }) {
         .lean(),
       AnimalModel.countDocuments(filter),
       AnimalModel.aggregate([
-        { $match: { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } } },
+        { $match: { status: "Alive", isArchived: { $ne: true }, $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] } },
         { $group: { _id: "$species", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
       AnimalModel.countDocuments({}),
       AnimalModel.countDocuments({ status: "Alive" }),
-      AnimalModel.countDocuments({ projectedSalesPrice: { $gt: 0 } }),
+      AnimalModel.countDocuments({ $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] }),
     ]);
     console.log(`[Animals SSR] Filter: ${JSON.stringify(filter)}`);
     console.log(`[Animals SSR] Found ${animals.length} items (page ${pageNum}), total matching: ${totalCount}`);

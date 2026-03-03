@@ -2,6 +2,7 @@ import Order from "@/models/Order";
 import Cart from "@/models/Cart";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
+import Animal from "@/models/Animal";
 import {
   deductInventoryForOrder,
   restoreInventoryForOrder,
@@ -139,15 +140,36 @@ export async function confirmOrderPayment(orderId) {
     $inc: { orderCount: 1, totalSpent: order.total },
   });
 
-  // Batch-increment product sales counters
-  const bulkOps = order.items.map((item) => ({
-    updateOne: {
-      filter: { _id: item.product },
-      update: { $inc: { salesCount: item.quantity } },
-    },
-  }));
+  // Batch-increment product sales counters AND update animal status
+  const bulkOps = [];
+  const animalUpdates = [];
+  
+  for (const item of order.items) {
+    bulkOps.push({
+      updateOne: {
+        filter: { _id: item.product },
+        update: { $inc: { salesCount: item.quantity } },
+      },
+    });
+
+    // Check if this product is an animal and update its status to "Sold"
+    const product = await Product.findById(item.product).select("animalRef").lean();
+    if (product && product.animalRef) {
+      animalUpdates.push({
+        updateOne: {
+          filter: { _id: product.animalRef },
+          update: { $set: { status: "Sold" } },
+        },
+      });
+    }
+  }
+
   if (bulkOps.length > 0) {
     await Product.bulkWrite(bulkOps);
+  }
+
+  if (animalUpdates.length > 0) {
+    await Animal.bulkWrite(animalUpdates);
   }
 
   // Send order confirmation emails now that payment is confirmed.

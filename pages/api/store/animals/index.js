@@ -38,7 +38,7 @@ async function handler(req, res) {
     const filter = {
       status: "Alive",
       isArchived: { $ne: true },
-      projectedSalesPrice: { $gt: 0 },
+      $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
     };
 
     if (species) {
@@ -64,9 +64,19 @@ async function handler(req, res) {
     }
 
     if (minPrice || maxPrice) {
-      filter.projectedSalesPrice = filter.projectedSalesPrice || { $gt: 0 };
-      if (minPrice) filter.projectedSalesPrice.$gte = parseFloat(minPrice);
-      if (maxPrice) filter.projectedSalesPrice.$lte = parseFloat(maxPrice);
+      // Use $or to match animals where either salesPrice or projectedSalesPrice falls in range
+      const priceFilters = [];
+      if (minPrice) {
+        priceFilters.push({ salesPrice: { $gte: parseFloat(minPrice) } });
+        priceFilters.push({ projectedSalesPrice: { $gte: parseFloat(minPrice) } });
+      }
+      if (maxPrice) {
+        priceFilters.push({ salesPrice: { $lte: parseFloat(maxPrice) } });
+        priceFilters.push({ projectedSalesPrice: { $lte: parseFloat(maxPrice) } });
+      }
+      if (priceFilters.length > 0) {
+        filter.$or = filter.$or ? { $and: [{ $or: filter.$or }, { $or: priceFilters }] } : { $or: priceFilters };
+      }
     }
 
     if (search && search.trim()) {
@@ -82,8 +92,8 @@ async function handler(req, res) {
 
     const sortMap = {
       newest: { createdAt: -1 },
-      price_asc: { projectedSalesPrice: 1 },
-      price_desc: { projectedSalesPrice: -1 },
+      price_asc: { salesPrice: 1, projectedSalesPrice: 1 },
+      price_desc: { salesPrice: -1, projectedSalesPrice: -1 },
       weight_asc: { currentWeight: 1 },
       weight_desc: { currentWeight: -1 },
       age_asc: { dob: -1 },   // youngest first (most recent dob)
@@ -97,7 +107,7 @@ async function handler(req, res) {
     const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * perPage;
 
-    const [animals, totalCount, allAnimalsCount, aliveCount, salesPriceCount] = await Promise.all([
+    const [animals, totalCount] = await Promise.all([
       Animal.find(filter)
         .sort(sortOption)
         .skip(skip)
@@ -107,9 +117,6 @@ async function handler(req, res) {
         .lean()
         .exec(),
       Animal.countDocuments(filter),
-      Animal.countDocuments({}),  // Total animals in DB
-      Animal.countDocuments({ status: "Alive" }),  // Alive animals
-      Animal.countDocuments({ projectedSalesPrice: { $gt: 0 } }),  // Animals with sales price
     ]);
 
     // Debug logging

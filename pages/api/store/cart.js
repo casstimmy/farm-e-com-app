@@ -149,15 +149,19 @@ async function getOrCreateProductForAnimal(animalId) {
   }
 
   const animal = await Animal.findById(animalId)
-    .select("name species tagId status isArchived projectedSalesPrice notes images")
+    .select("name species tagId status isArchived projectedSalesPrice salesPrice notes images")
     .lean();
   if (
     !animal ||
     animal.status !== "Alive" ||
-    animal.isArchived === true ||
-    !animal.projectedSalesPrice ||
-    animal.projectedSalesPrice <= 0
+    animal.isArchived === true
   ) {
+    return null;
+  }
+
+  // Use salesPrice if set, otherwise fall back to projectedSalesPrice
+  const price = animal.salesPrice || animal.projectedSalesPrice;
+  if (!price || price <= 0) {
     return null;
   }
 
@@ -176,7 +180,7 @@ async function getOrCreateProductForAnimal(animalId) {
     productType: "physical",
     animalRef: animal._id,
     description: animal.notes || "",
-    price: animal.projectedSalesPrice,
+    price: price,
     costPrice: 0,
     unit: "Animal",
     trackInventory: true,
