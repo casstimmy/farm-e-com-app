@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CUSTOMER_TOKEN_PREFIX = "customer";
+const TOKEN_EXPIRY = "30d";
 
 if (!JWT_SECRET) {
   throw new Error("Missing JWT_SECRET environment variable");
@@ -11,15 +12,13 @@ if (!JWT_SECRET) {
  * Generate a JWT token for a customer.
  */
 export function generateCustomerToken(customer) {
-  return jwt.sign(
-    {
-      id: customer._id,
-      email: customer.email,
-      type: CUSTOMER_TOKEN_PREFIX,
-    },
-    JWT_SECRET,
-    { expiresIn: "30d" }
-  );
+  const payload = {
+    id: customer._id || customer.id,
+    email: customer.email,
+    type: CUSTOMER_TOKEN_PREFIX,
+  };
+  
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
 }
 
 /**
@@ -30,11 +29,8 @@ export function verifyCustomerToken(token) {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded.type !== CUSTOMER_TOKEN_PREFIX) return null;
     return decoded;
-  } catch {
-    return null;
-  }
-}
-
+  } catch (error) {
+    console.debug("Token verification failed:", error.message);
 /**
  * Extract Bearer token from the Authorization header.
  */

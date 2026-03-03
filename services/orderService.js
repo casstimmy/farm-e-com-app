@@ -7,6 +7,11 @@ import {
   restoreInventoryForOrder,
   createSalesFinanceRecord,
 } from "./inventorySync";
+import {
+  sendOrderConfirmationEmail,
+  sendShipmentNotificationEmail,
+  sendDeliveryConfirmationEmail,
+} from "./emailService";
 
 /**
  * Order Service
@@ -101,7 +106,7 @@ export async function createOrder({
  * Process a successful payment for an order.
  */
 export async function confirmOrderPayment(orderId) {
-  const order = await Order.findById(orderId);
+  const order = await Order.findById(orderId).populate("customer");
   if (!order) throw new Error("Order not found");
   if (order.paymentStatus === "Paid") return order;
 
@@ -121,7 +126,7 @@ export async function confirmOrderPayment(orderId) {
   await createSalesFinanceRecord(order);
 
   // Update customer stats
-  await Customer.findByIdAndUpdate(order.customer, {
+  await Customer.findByIdAndUpdate(order.customer._id, {
     $inc: { orderCount: 1, totalSpent: order.total },
   });
 
@@ -130,6 +135,14 @@ export async function confirmOrderPayment(orderId) {
     await Product.findByIdAndUpdate(item.product, {
       $inc: { salesCount: item.quantity },
     });
+  }
+
+  // Send order confirmation email
+  try {
+    await sendOrderConfirmationEmail(order.toObject(), order.customer);
+  } catch (emailError) {
+    console.error("Failed to send order confirmation email:", emailError);
+    // Don't fail the entire process if email fails
   }
 
   return order;
@@ -141,15 +154,7 @@ export async function confirmOrderPayment(orderId) {
 const ALLOWED_TRANSITIONS = {
   Pending: ["Paid", "Cancelled"],
   Paid: ["Processing", "Cancelled", "Refunded"],
-  Processing: ["Shipped", "Cancelled"],
-  Shipped: ["Delivered"],
-  Delivered: [],
-  Cancelled: [],
-  Refunded: [],
-};
-
-export async function updateOrderStatus(orderId, newStatus, { note, changedBy } = {}) {
-  const order = await Order.findById(orderId);
+  Processing: ["Shipped", "Cancelled"],.populate("customer");
   if (!order) throw new Error("Order not found");
 
   const allowed = ALLOWED_TRANSITIONS[order.status];
@@ -167,6 +172,30 @@ export async function updateOrderStatus(orderId, newStatus, { note, changedBy } 
       lastEntry.note = note;
       lastEntry.changedBy = changedBy;
     }
+  }
+
+  if (newStatus === "Cancelled") {
+    order.cancellationReason = note || "";
+    if (order.inventoryDeducted) {
+      await restoreInventoryForOrder(orderId);
+    }
+  }
+
+  await order.save();
+
+  // Send status update emails
+  try {
+    if (newStatus === "Shipped") {
+      await sendShipmentNotificationEmail(order.toObject(), order.customer, {
+        trackingNumber: note || "To be provided",
+        estimatedDelivery: "3-5 business days"
+      });
+    } else if (newStatus === "Delivered") {
+      await sendDeliveryConfirmationEmail(order.toObject(), order.customer);
+    }
+  } catch (emailError) {
+    console.error("Failed to send status update email:", emailError);
+    // Don't fail the entire process if email fails
   }
 
   if (newStatus === "Cancelled") {

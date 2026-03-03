@@ -32,18 +32,27 @@ const CustomerSchema = new mongoose.Schema(
       match: [/^[\d+\-\s()]{7,20}$/, "Please provide a valid phone number"],
     },
     addresses: [AddressSchema],
-    isActive: { type: Boolean, default: true },
+    location: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
+      default: null,
+      index: true
+    },
+    locationName: { type: String, default: "Online", index: true },
+    isActive: { type: Boolean, default: true, index: true },
     isVerified: { type: Boolean, default: false },
     lastLogin: Date,
     orderCount: { type: Number, default: 0 },
     totalSpent: { type: Number, default: 0 },
+    notes: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
 CustomerSchema.index({ email: 1 }, { unique: true });
-CustomerSchema.index({ isActive: 1 });
-CustomerSchema.index({ createdAt: -1 });
+CustomerSchema.index({ isActive: 1, createdAt: -1 });
+CustomerSchema.index({ firstName: 1, lastName: 1 });
+CustomerSchema.index({ location: 1 });
 
 CustomerSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;

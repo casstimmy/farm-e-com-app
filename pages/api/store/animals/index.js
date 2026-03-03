@@ -64,7 +64,7 @@ async function handler(req, res) {
     }
 
     if (minPrice || maxPrice) {
-      filter.projectedSalesPrice = { ...filter.projectedSalesPrice };
+      filter.projectedSalesPrice = filter.projectedSalesPrice || { $gt: 0 };
       if (minPrice) filter.projectedSalesPrice.$gte = parseFloat(minPrice);
       if (maxPrice) filter.projectedSalesPrice.$lte = parseFloat(maxPrice);
     }
@@ -104,7 +104,8 @@ async function handler(req, res) {
         .limit(perPage)
         .populate("location", "name city state")
         .select("-purchaseCost -totalFeedCost -totalMedicationCost -marginPercent -sire -dam -recordedBy -isArchived -archivedAt -archivedReason")
-        .lean(),
+        .lean()
+        .exec(),
       Animal.countDocuments(filter),
     ]);
 
