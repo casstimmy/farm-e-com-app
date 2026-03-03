@@ -13,6 +13,7 @@ import {
   FaBars,
   FaTimes,
   FaSyncAlt,
+  FaBlog,
 } from "react-icons/fa";
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/admin/orders", label: "Orders", icon: FaShoppingCart },
   { href: "/admin/categories", label: "Categories", icon: FaTags },
   { href: "/admin/customers", label: "Customers", icon: FaUsers },
+  { href: "/admin/blog", label: "Blog", icon: FaBlog },
 ];
 
 export default function AdminLayout({ children }) {

@@ -1,19 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Allow images from known domains
+  // Allow images from any HTTPS source (product images managed externally)
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "farm-fresh-store.s3.us-east-1.amazonaws.com",
-      },
-      {
-        protocol: "https",
-        hostname: "farm-fresh-store.s3.amazonaws.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.amazonaws.com",
+        hostname: "**",
       },
     ],
   },

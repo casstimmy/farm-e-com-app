@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
+import AdminLayout from "@/components/admin/AdminLayout";
 import PageHeader from "@/components/shared/PageHeader";
 import Modal from "@/components/shared/Modal";
 import { FaPencilAlt, FaTrash, FaEye, FaEyeSlash, FaStar, FaRegStar } from "react-icons/fa";
@@ -34,7 +35,7 @@ export default function ManageBlog() {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("adminToken");
       const { data } = await axios.get(
         `/api/admin/store/blog?status=${filter}&sort=${sort}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -84,7 +85,7 @@ export default function ManageBlog() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("adminToken");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       if (editingPost) {
@@ -111,7 +112,7 @@ export default function ManageBlog() {
     if (!window.confirm("Are you sure you want to delete this blog post?")) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("adminToken");
       await axios.delete(`/api/admin/store/blog/${postId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -124,7 +125,8 @@ export default function ManageBlog() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+    <AdminLayout>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Page Header */}
       <PageHeader
         title="Blog Management"
@@ -431,9 +433,7 @@ export default function ManageBlog() {
           </div>
         </form>
       </Modal>
-    </motion.div>
+      </motion.div>
+    </AdminLayout>
   );
 }
-
-ManageBlog.layoutType = "default";
-ManageBlog.layoutProps = { title: "Blog Management" };
