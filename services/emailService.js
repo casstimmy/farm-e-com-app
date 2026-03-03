@@ -98,11 +98,11 @@ export async function sendOrderConfirmationEmail(order, customer) {
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .header h1 { margin: 0; font-size: 28px; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-        .order-info { background: white; padding: 20px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #667eea; }
-        .order-info h3 { margin-top: 0; color: #667eea; }
+        .order-info { background: white; padding: 20px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #16a34a; }
+        .order-info h3 { margin-top: 0; color: #16a34a; }
         .order-details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .detail-item { background: white; padding: 12px; border-radius: 4px; }
         .detail-label { color: #666; font-size: 12px; text-transform: uppercase; }
@@ -111,11 +111,11 @@ export async function sendOrderConfirmationEmail(order, customer) {
         th { background: #f0f0f0; padding: 12px; text-align: left; font-weight: 600; color: #333; }
         .summary { background: white; padding: 20px; border-radius: 6px; margin-top: 20px; }
         .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .summary-row.total { font-size: 18px; font-weight: bold; color: #667eea; border: none; padding-top: 12px; }
+        .summary-row.total { font-size: 18px; font-weight: bold; color: #16a34a; border: none; padding-top: 12px; }
         .shipping-address { background: white; padding: 20px; border-radius: 6px; margin-top: 20px; }
         .shipping-address h4 { margin-top: 0; color: #333; }
         .address-text { margin: 8px 0; color: #666; line-height: 1.6; }
-        .cta-button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: 600; }
+        .cta-button { display: inline-block; background: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: 600; }
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px; }
       </style>
     </head>
@@ -238,10 +238,10 @@ export async function sendShipmentNotificationEmail(order, customer, trackingInf
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-        .tracking-box { background: white; padding: 20px; border-radius: 6px; border-left: 4px solid #667eea; margin: 20px 0; }
-        .tracking-number { font-size: 18px; font-weight: bold; color: #667eea; font-family: monospace; }
+        .tracking-box { background: white; padding: 20px; border-radius: 6px; border-left: 4px solid #16a34a; margin: 20px 0; }
+        .tracking-number { font-size: 18px; font-weight: bold; color: #16a34a; font-family: monospace; }
       </style>
     </head>
     <body>
@@ -302,11 +302,11 @@ export async function sendDeliveryConfirmationEmail(order, customer) {
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
         .success-box { background: white; padding: 20px; border-radius: 6px; border-left: 4px solid #10b981; margin: 20px 0; text-align: center; }
         .success-icon { font-size: 48px; margin-bottom: 10px; }
-        .cta { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; margin-top: 15px; }
+        .cta { display: inline-block; background: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; margin-top: 15px; }
       </style>
     </head>
     <body>
@@ -365,7 +365,7 @@ export async function sendWelcomeEmail(customer) {
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
         .feature { background: white; padding: 15px; border-radius: 4px; margin: 10px 0; }
       </style>
@@ -416,6 +416,142 @@ export async function sendWelcomeEmail(customer) {
     console.error("Failed to send welcome email:", error);
     return false;
   }
+}
+
+/**
+ * Send email verification code
+ */
+export async function sendVerificationEmail(customer, code) {
+  const safeFirstName = escapeHtml(customer.firstName);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+        .code-box { background: white; border: 2px dashed #16a34a; padding: 24px; border-radius: 8px; text-align: center; margin: 24px 0; }
+        .code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #16a34a; font-family: monospace; }
+        .footer { text-align: center; margin-top: 20px; color: #999; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Verify Your Email</h1>
+        </div>
+        <div class="content">
+          <p>Hi ${safeFirstName},</p>
+          <p>Thank you for creating an account with ${APP_NAME}. Please use the code below to verify your email address:</p>
+          
+          <div class="code-box">
+            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">Your verification code</p>
+            <div class="code">${escapeHtml(code)}</div>
+          </div>
+
+          <p style="color: #666; font-size: 14px;">This code expires in <strong>30 minutes</strong>.</p>
+          <p style="color: #666; font-size: 14px;">If you didn't create an account, you can safely ignore this email.</p>
+
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${APP_NAME}" <${EMAIL_USER}>`,
+      to: customer.email,
+      subject: `${code} is your ${APP_NAME} verification code`,
+      html,
+    });
+    console.log(`Verification email sent to ${customer.email}`);
+    return true;
+  } catch (error) {
+    console.error("Failed to send verification email:", error);
+    return false;
+  }
+}
+
+/**
+ * Send password reset code
+ */
+export async function sendResetPasswordEmail(customer, code) {
+  const safeFirstName = escapeHtml(customer.firstName);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #16a34a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+        .code-box { background: white; border: 2px dashed #dc2626; padding: 24px; border-radius: 8px; text-align: center; margin: 24px 0; }
+        .code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #dc2626; font-family: monospace; }
+        .warning { background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+        .footer { text-align: center; margin-top: 20px; color: #999; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Reset Your Password</h1>
+        </div>
+        <div class="content">
+          <p>Hi ${safeFirstName},</p>
+          <p>We received a request to reset the password for your ${APP_NAME} account. Use the code below to set a new password:</p>
+          
+          <div class="code-box">
+            <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">Your password reset code</p>
+            <div class="code">${escapeHtml(code)}</div>
+          </div>
+
+          <p style="color: #666; font-size: 14px;">This code expires in <strong>30 minutes</strong>.</p>
+
+          <div class="warning">
+            <strong>Didn't request this?</strong>
+            <p style="margin: 4px 0 0 0; font-size: 13px;">If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
+          </div>
+
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${APP_NAME}" <${EMAIL_USER}>`,
+      to: customer.email,
+      subject: `${code} is your ${APP_NAME} password reset code`,
+      html,
+    });
+    console.log(`Password reset email sent to ${customer.email}`);
+    return true;
+  } catch (error) {
+    console.error("Failed to send reset email:", error);
+    return false;
+  }
+}
+
+/**
+ * Resend verification code
+ */
+export async function resendVerificationEmail(customer, code) {
+  return sendVerificationEmail(customer, code);
 }
 
 export default { getTransporter, verifyEmailConnection };

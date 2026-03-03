@@ -1,10 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import Head from "next/head";
 import { motion } from "framer-motion";
 import axios from "axios";
 import StoreLayout from "@/components/store/StoreLayout";
-import { FaCalendar, FaUser, FaArrowRight, FaSearch } from "react-icons/fa";
+import {
+  FaCalendar,
+  FaArrowRight,
+  FaArrowLeft,
+  FaSearch,
+  FaEye,
+  FaStar,
+  FaTag,
+} from "react-icons/fa";
 
 export default function BlogPage() {
   const router = useRouter();
@@ -19,7 +28,6 @@ export default function BlogPage() {
 
   useEffect(() => {
     if (!router.isReady) return;
-
     if (slug) {
       fetchSinglePost();
     } else {
@@ -45,12 +53,13 @@ export default function BlogPage() {
       const params = {
         category: selectedCategory === "all" ? undefined : selectedCategory,
         page: page || 1,
-        limit: 10,
+        limit: 9,
       };
-      const { data } = await axios.get(`/api/store/blog`, { params });
-      setPosts(data.posts);
-      setCategories(data.categories);
-      setPagination(data.pagination);
+      if (searchTerm.trim()) params.search = searchTerm.trim();
+      const { data } = await axios.get("/api/store/blog", { params });
+      setPosts(data.posts || []);
+      setCategories(data.categories || []);
+      setPagination(data.pagination || {});
     } catch (error) {
       console.error("Failed to fetch posts:", error);
     } finally {
@@ -60,161 +69,191 @@ export default function BlogPage() {
 
   const handleCategoryChange = (cat) => {
     setSelectedCategory(cat);
-    router.push(`/blog?category=${cat}`);
+    router.push(`/blog?category=${cat}`, undefined, { shallow: true });
   };
+
+  const handleSearch = useCallback(
+    (e) => {
+      e.preventDefault();
+      fetchPosts();
+    },
+    [searchTerm, selectedCategory]
+  );
 
   if (loading) {
     return (
       <StoreLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="text-gray-500">Loading...</div>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-gray-500 text-sm">Loading...</p>
+          </div>
         </div>
       </StoreLayout>
     );
   }
 
-  // Single Post View
+  // ── Single Post View ──
   if (singlePost) {
     return (
       <StoreLayout>
-        <article className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-          {/* Back Button */}
+        <Head>
+          <title>{singlePost.title} | Blog</title>
+          {singlePost.seoDescription && (
+            <meta name="description" content={singlePost.seoDescription} />
+          )}
+        </Head>
+
+        <article className="max-w-3xl mx-auto py-10 px-4 sm:px-6">
+          {/* Back */}
           <Link
             href="/blog"
-            className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 mb-6 font-semibold"
+            className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 mb-8 text-sm font-medium"
           >
-            ← Back to Blog
+            <FaArrowLeft size={12} />
+            Back to Blog
           </Link>
 
-          {/* Header */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
           >
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
+            {/* Meta */}
+            <div className="flex items-center gap-3 mb-4 flex-wrap text-sm">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 rounded-md font-medium">
+                <FaTag size={10} />
                 {singlePost.category}
               </span>
-              <span className="text-sm text-gray-500 flex items-center gap-1">
-                <FaCalendar size={12} />
+              <span className="text-gray-400 flex items-center gap-1.5">
+                <FaCalendar size={11} />
                 {new Date(singlePost.publishedAt).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
                 })}
               </span>
-              <span className="text-sm text-gray-500 flex items-center gap-1">
-                <FaUser size={12} />
-                {singlePost.author}
+              <span className="text-gray-400 flex items-center gap-1.5">
+                <FaEye size={11} />
+                {singlePost.views || 0} views
               </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+
+            {/* Title */}
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 leading-tight">
               {singlePost.title}
             </h1>
-            <p className="text-xl text-gray-600">{singlePost.excerpt}</p>
-          </motion.div>
 
-          {/* Cover Image */}
-          {singlePost.coverImage && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mb-8 rounded-2xl overflow-hidden shadow-xl"
-            >
-              <img
-                src={singlePost.coverImage}
-                alt={singlePost.title}
-                className="w-full h-96 object-cover"
+            {singlePost.excerpt && (
+              <p className="text-lg text-gray-500 mb-8 leading-relaxed">
+                {singlePost.excerpt}
+              </p>
+            )}
+
+            {/* Cover Image */}
+            {singlePost.coverImage && (
+              <div className="mb-8 rounded-xl overflow-hidden">
+                <img
+                  src={singlePost.coverImage}
+                  alt={singlePost.title}
+                  className="w-full h-64 sm:h-80 object-cover"
+                />
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="prose prose-gray prose-lg max-w-none mb-10 leading-relaxed [&_p]:mb-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-2 [&_blockquote]:border-l-4 [&_blockquote]:border-green-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600 [&_a]:text-green-600 [&_a]:underline">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: singlePost.content.replace(/\n/g, "<br>"),
+                }}
               />
-            </motion.div>
-          )}
-
-          {/* Content */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="prose prose-lg max-w-none text-gray-700 mb-8"
-          >
-            <div
-              dangerouslySetInnerHTML={{
-                __html: singlePost.content.replace(/\n/g, "<br>"),
-              }}
-            />
-          </motion.div>
-
-          {/* Tags */}
-          {singlePost.tags && singlePost.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-8 pt-8 border-t border-gray-200">
-              {singlePost.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold hover:bg-indigo-200 cursor-pointer transition-all"
-                >
-                  #{tag}
-                </span>
-              ))}
             </div>
-          )}
 
-          {/* Stats */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 text-center">
-            <p className="text-gray-600">
-              👁️ <strong>{singlePost.views || 0}</strong> people have read this article
-            </p>
-          </div>
+            {/* Tags */}
+            {singlePost.tags && singlePost.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-6 border-t border-gray-100">
+                {singlePost.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-3 py-1 bg-gray-100 text-gray-600 rounded-md text-sm font-medium"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Author / Stats */}
+            <div className="mt-8 p-5 bg-gray-50 rounded-xl flex items-center justify-between text-sm text-gray-500">
+              <span>
+                By <strong className="text-gray-700">{singlePost.author || "Farm Team"}</strong>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <FaEye size={12} />
+                {singlePost.views || 0} readers
+              </span>
+            </div>
+          </motion.div>
         </article>
       </StoreLayout>
     );
   }
 
-  // Blog List View
+  // ── Blog List View ──
   return (
     <StoreLayout>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">
-              Farm <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">Blog</span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-8">
-              Learn about farming, fresh produce, and sustainable agriculture
-            </p>
+      <Head>
+        <title>Blog | Farm Fresh Store</title>
+        <meta name="description" content="Read our latest articles about farming, agriculture, and fresh produce" />
+      </Head>
 
-            {/* Search */}
-            <div className="max-w-md mx-auto relative">
-              <input
-                type="text"
-                placeholder="Search articles..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-3 pr-12 rounded-lg border-2 border-purple-300 focus:outline-none focus:border-purple-500"
-              />
-              <FaSearch className="absolute right-4 top-4 text-gray-400" />
+      <div className="min-h-screen bg-white">
+        {/* Page Header */}
+        <div className="bg-gray-50 border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+            <div className="text-center max-w-2xl mx-auto">
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+                Our Blog
+              </h1>
+              <p className="text-gray-500 mb-6">
+                Tips, stories, and insights from the farm
+              </p>
+
+              {/* Search */}
+              <form onSubmit={handleSearch} className="max-w-md mx-auto relative">
+                <input
+                  type="text"
+                  placeholder="Search articles..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-11 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600"
+                >
+                  <FaSearch size={14} />
+                </button>
+              </form>
             </div>
-          </motion.div>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="lg:col-span-1"
-            >
-              <div className="bg-white rounded-xl shadow-md p-6 sticky top-20">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Categories</h3>
-                <div className="space-y-2">
+            <aside className="lg:w-56 flex-shrink-0">
+              <div className="sticky top-24">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                  Categories
+                </h3>
+                <nav className="space-y-1">
                   <button
                     onClick={() => handleCategoryChange("all")}
-                    className={`w-full text-left px-4 py-2 rounded-lg font-semibold transition-all ${
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       selectedCategory === "all"
-                        ? "bg-purple-600 text-white"
-                        : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+                        ? "bg-green-50 text-green-700"
+                        : "text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     All Articles
@@ -223,95 +262,97 @@ export default function BlogPage() {
                     <button
                       key={cat.name}
                       onClick={() => handleCategoryChange(cat.name)}
-                      className={`w-full text-left px-4 py-2 rounded-lg font-semibold transition-all flex justify-between items-center ${
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
                         selectedCategory === cat.name
-                          ? "bg-purple-600 text-white"
-                          : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+                          ? "bg-green-50 text-green-700"
+                          : "text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       {cat.name}
-                      <span className="text-xs font-bold">{cat.count}</span>
+                      <span className="text-xs text-gray-400">{cat.count}</span>
                     </button>
                   ))}
-                </div>
+                </nav>
               </div>
-            </motion.div>
+            </aside>
 
             {/* Posts Grid */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="lg:col-span-3"
-            >
+            <div className="flex-1 min-w-0">
               {posts.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">No articles found</p>
+                <div className="text-center py-16">
+                  <p className="text-gray-400 text-lg mb-2">No articles found</p>
+                  <p className="text-gray-400 text-sm">Try a different category or search term</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {posts.map((post, idx) => (
                     <motion.article
                       key={post._id}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden border border-gray-100 group"
+                      transition={{ delay: idx * 0.05 }}
+                      className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"
                     >
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-                        {/* Image */}
-                        {post.coverImage && (
-                          <div className="md:col-span-1 overflow-hidden rounded-lg h-48 md:h-auto">
-                            <img
-                              src={post.coverImage}
-                              alt={post.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          </div>
-                        )}
-
-                        {/* Content */}
-                        <div className={post.coverImage ? "md:col-span-2" : "md:col-span-3"}>
-                          <div className="flex items-center gap-2 mb-3 flex-wrap">
-                            <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
-                              {post.category}
-                            </span>
-                            {post.isFeatured && (
-                              <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
-                                ⭐ Featured
-                              </span>
-                            )}
-                          </div>
-
-                          <h2 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">
-                            {post.title}
-                          </h2>
-
-                          <p className="text-gray-600 mb-4 line-clamp-2">
-                            {post.excerpt}
-                          </p>
-
-                          <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                            <span className="flex items-center gap-1">
-                              <FaCalendar size={12} />
-                              {new Date(post.publishedAt).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              👁️ {post.views || 0} views
-                            </span>
-                          </div>
-
-                          <Link
-                            href={`/blog/${post.slug}`}
-                            className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 font-semibold group/link"
-                          >
-                            Read Article
-                            <FaArrowRight size={14} className="group-hover/link:translate-x-1 transition-transform" />
-                          </Link>
+                      {/* Image */}
+                      {post.coverImage && (
+                        <div className="h-44 overflow-hidden">
+                          <img
+                            src={post.coverImage}
+                            alt={post.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
                         </div>
+                      )}
+
+                      <div className="p-5">
+                        {/* Category + Featured */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="inline-block px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-medium">
+                            {post.category}
+                          </span>
+                          {post.isFeatured && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 rounded text-xs font-medium">
+                              <FaStar size={9} />
+                              Featured
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Title */}
+                        <h2 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-green-700 transition-colors leading-snug">
+                          {post.title}
+                        </h2>
+
+                        {/* Excerpt */}
+                        <p className="text-gray-500 text-sm mb-4 line-clamp-2 leading-relaxed">
+                          {post.excerpt}
+                        </p>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between text-xs text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <FaCalendar size={10} />
+                            {new Date(post.publishedAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <FaEye size={10} />
+                            {post.views || 0}
+                          </span>
+                        </div>
+
+                        {/* Read More */}
+                        <Link
+                          href={`/blog/${post.slug}`}
+                          className="inline-flex items-center gap-1.5 text-green-600 hover:text-green-700 text-sm font-medium mt-4 group/link"
+                        >
+                          Read Article
+                          <FaArrowRight size={11} className="group-hover/link:translate-x-0.5 transition-transform" />
+                        </Link>
                       </div>
                     </motion.article>
                   ))}
@@ -320,16 +361,16 @@ export default function BlogPage() {
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (
-                <div className="flex justify-center gap-2 mt-12">
+                <div className="flex justify-center gap-2 mt-10">
                   {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
                     (p) => (
                       <Link
                         key={p}
                         href={`/blog?page=${p}&category=${selectedCategory}`}
-                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                        className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
                           parseInt(page || 1) === p
-                            ? "bg-purple-600 text-white"
-                            : "bg-white text-gray-900 border-2 border-gray-300 hover:border-purple-600"
+                            ? "bg-green-600 text-white"
+                            : "bg-white text-gray-600 border border-gray-200 hover:border-green-300"
                         }`}
                       >
                         {p}
@@ -338,7 +379,7 @@ export default function BlogPage() {
                   )}
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>

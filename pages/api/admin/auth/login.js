@@ -71,8 +71,8 @@ export default withRateLimit(
   {
     keyPrefix: "admin-auth-login",
     methods: ["POST"],
-    windowMs: 5 * 60 * 1000,
-    max: 20,
+    windowMs: 15 * 60 * 1000,
+    max: 5,
   },
   handler
 );

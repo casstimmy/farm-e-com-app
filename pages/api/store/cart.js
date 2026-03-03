@@ -312,7 +312,7 @@ async function handler(req, res) {
         }
       }
 
-      const requestedQty = Math.max(1, parseInt(quantity, 10) || 1);
+      const requestedQty = Math.max(1, Math.min(99, parseInt(quantity, 10) || 1));
 
       if (product.trackInventory && product.stockQuantity < requestedQty) {
         return res.status(400).json({
@@ -393,6 +393,9 @@ async function handler(req, res) {
       if (newQty <= 0) {
         cart.items.pull(itemId);
       } else {
+        if (newQty > 99) {
+          return res.status(400).json({ error: "Maximum quantity per item is 99" });
+        }
         const product = await Product.findById(item.product);
         if (product?.trackInventory && newQty > product.stockQuantity) {
           return res.status(400).json({

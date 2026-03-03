@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Customer from "@/models/Customer";
 import { withAdminAuth } from "@/utils/adminAuth";
+import { withRateLimit } from "@/lib/rateLimit";
 
 /**
  * Admin customer management endpoint.
@@ -32,11 +33,13 @@ async function handler(req, res) {
     if (active === "false") filter.isActive = false;
 
     if (search) {
+      // Escape regex special characters to prevent ReDoS
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       filter.$or = [
-        { firstName: { $regex: search, $options: "i" } },
-        { lastName: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
+        { firstName: { $regex: escaped, $options: "i" } },
+        { lastName: { $regex: escaped, $options: "i" } },
+        { email: { $regex: escaped, $options: "i" } },
+        { phone: { $regex: escaped, $options: "i" } },
       ];
     }
 
@@ -72,8 +75,17 @@ async function handler(req, res) {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Admin customers error:", error);
+    res.status(500).json({ error: "Failed to fetch customers" });
   }
 }
 
-export default withAdminAuth(handler);
+export default withRateLimit(
+  {
+    keyPrefix: "admin-store-customers",
+    methods: ["GET"],
+    windowMs: 60 * 1000,
+    max: 120,
+  },
+  withAdminAuth(handler)
+);

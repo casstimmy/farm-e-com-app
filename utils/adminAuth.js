@@ -28,7 +28,12 @@ export function generateAdminToken(user) {
  */
 export function verifyAdminToken(token) {
   try {
-    return jwt.verify(token, ADMIN_JWT_SECRET);
+    const decoded = jwt.verify(token, ADMIN_JWT_SECRET);
+    // Ensure this is actually an admin token (has role) and not a customer token
+    if (!decoded.role || !['SuperAdmin', 'Manager', 'Worker'].includes(decoded.role)) {
+      return null;
+    }
+    return decoded;
   } catch {
     return null;
   }

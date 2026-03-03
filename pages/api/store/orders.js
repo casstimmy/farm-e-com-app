@@ -20,12 +20,17 @@ async function handler(req, res) {
     const { id, order: orderNumber, page = 1, limit = 10 } = req.query;
 
     if (id || orderNumber) {
+      // Validate ObjectId format before querying
+      if (id && !/^[a-f\d]{24}$/i.test(id)) {
+        return res.status(400).json({ error: "Invalid order ID format" });
+      }
       const findQuery = { customer: customerId };
       if (id) findQuery._id = id;
       if (orderNumber) findQuery.orderNumber = orderNumber;
 
       const orderDoc = await Order.findOne(findQuery)
         .populate("items.product", "name slug images")
+        .select("-items.costPrice")
         .lean();
 
       if (!orderDoc) {

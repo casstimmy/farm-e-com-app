@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const AddressSchema = new mongoose.Schema(
   {
@@ -42,6 +43,12 @@ const CustomerSchema = new mongoose.Schema(
     locationName: { type: String, default: "Online", index: true },
     isActive: { type: Boolean, default: true, index: true },
     isVerified: { type: Boolean, default: false },
+    // Email verification
+    verificationToken: { type: String, default: null },
+    verificationExpiry: { type: Date, default: null },
+    // Password reset
+    resetToken: { type: String, default: null },
+    resetTokenExpiry: { type: Date, default: null },
     lastLogin: Date,
     orderCount: { type: Number, default: 0 },
     totalSpent: { type: Number, default: 0 },
@@ -69,6 +76,27 @@ CustomerSchema.pre("save", async function (next) {
 // Compare submitted password with stored hash
 CustomerSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
+};
+
+// Generate email verification token (6-digit code)
+CustomerSchema.methods.generateVerificationToken = function () {
+  const code = crypto.randomInt(100000, 999999).toString();
+  this.verificationToken = crypto.createHash("sha256").update(code).digest("hex");
+  this.verificationExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+  return code;
+};
+
+// Generate password reset token (6-digit code)
+CustomerSchema.methods.generateResetToken = function () {
+  const code = crypto.randomInt(100000, 999999).toString();
+  this.resetToken = crypto.createHash("sha256").update(code).digest("hex");
+  this.resetTokenExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+  return code;
+};
+
+// Verify a token against a hashed value
+CustomerSchema.statics.hashToken = function (token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 };
 
 CustomerSchema.virtual("fullName").get(function () {

@@ -22,12 +22,29 @@ async function handler(req, res) {
 
   try {
     const customerId = req.customer.id;
-    const { shippingAddress, paymentMethod = "Paystack", notes = "" } = req.body;
+    const { shippingAddress, paymentMethod = "Paystack", notes: rawNotes = "" } = req.body;
+
+    // Validate paymentMethod against allowed values
+    const ALLOWED_PAYMENT_METHODS = ["Paystack", "Bank Transfer", "Pay on Delivery"];
+    if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({ error: "Invalid payment method" });
+    }
+
+    // Sanitize and limit notes
+    const notes = typeof rawNotes === "string" ? rawNotes.trim().slice(0, 500) : "";
 
     if (!shippingAddress || !shippingAddress.street || !shippingAddress.city || !shippingAddress.state) {
       return res.status(400).json({
         error: "Shipping address with street, city, and state is required",
       });
+    }
+
+    // Validate shipping address field lengths
+    const MAX_ADDR_LEN = 200;
+    for (const field of ["street", "city", "state", "postalCode", "country"]) {
+      if (shippingAddress[field] && String(shippingAddress[field]).length > MAX_ADDR_LEN) {
+        return res.status(400).json({ error: `Address ${field} is too long (max ${MAX_ADDR_LEN} chars)` });
+      }
     }
 
     const cart = await Cart.findOne({ customer: customerId });
@@ -58,28 +75,33 @@ async function handler(req, res) {
     const customer = await Customer.findById(customerId);
     if (customer) {
       const normalized = {
-        street: shippingAddress.street?.trim() || "",
-        city: shippingAddress.city?.trim() || "",
-        state: shippingAddress.state?.trim() || "",
-        postalCode: shippingAddress.postalCode?.trim() || "",
-        country: shippingAddress.country?.trim() || "Nigeria",
+        street: shippingAddress.street?.trim().slice(0, 200) || "",
+        city: shippingAddress.city?.trim().slice(0, 200) || "",
+        state: shippingAddress.state?.trim().slice(0, 200) || "",
+        postalCode: shippingAddress.postalCode?.trim().slice(0, 20) || "",
+        country: shippingAddress.country?.trim().slice(0, 100) || "Nigeria",
       };
       const addresses = customer.addresses || [];
-      const exists = addresses.some(
-        (a) =>
-          a.street === normalized.street &&
-          a.city === normalized.city &&
-          a.state === normalized.state &&
-          (a.postalCode || "") === normalized.postalCode
-      );
-      if (!exists && normalized.street && normalized.city && normalized.state) {
-        addresses.push({
-          label: "Checkout Address",
-          ...normalized,
-          isDefault: addresses.length === 0,
-        });
-        customer.addresses = addresses;
-        await customer.save();
+      // Limit total addresses stored
+      if (addresses.length >= 10) {
+        // Don't add more, just continue
+      } else {
+        const exists = addresses.some(
+          (a) =>
+            a.street === normalized.street &&
+            a.city === normalized.city &&
+            a.state === normalized.state &&
+            (a.postalCode || "") === normalized.postalCode
+        );
+        if (!exists && normalized.street && normalized.city && normalized.state) {
+          addresses.push({
+            label: "Checkout Address",
+            ...normalized,
+            isDefault: addresses.length === 0,
+          });
+          customer.addresses = addresses;
+          await customer.save();
+        }
       }
     }
 
@@ -124,7 +146,7 @@ async function handler(req, res) {
     });
   } catch (error) {
     console.error("Checkout error:", error);
-    res.status(500).json({ error: error.message || "Checkout failed" });
+    res.status(500).json({ error: "Checkout failed. Please try again." });
   }
 }
 

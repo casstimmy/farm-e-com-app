@@ -18,13 +18,18 @@ async function handler(req, res) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const customer = await Customer.findOne({ email });
+    // Select password explicitly in case schema ever excludes it
+    const customer = await Customer.findOne({ email }).select("+password");
     if (!customer) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     if (!customer.isActive) {
-      return res.status(403).json({ error: "Your account has been deactivated" });
+      return res.status(403).json({ error: "Your account has been deactivated. Contact support for help." });
+    }
+
+    if (!customer.isVerified) {
+      return res.status(403).json({ error: "Please verify your email before logging in. Check your inbox for the verification link." });
     }
 
     const isMatch = await customer.comparePassword(password);
@@ -32,8 +37,8 @@ async function handler(req, res) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    customer.lastLogin = new Date();
-    await customer.save();
+    // Use updateOne to avoid triggering pre-save hook (prevents re-hashing password)
+    await Customer.updateOne({ _id: customer._id }, { $set: { lastLogin: new Date() } });
 
     const token = generateCustomerToken(customer);
     return res.status(200).json({

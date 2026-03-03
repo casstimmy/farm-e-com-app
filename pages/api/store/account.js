@@ -42,6 +42,10 @@ async function handler(req, res) {
       if (phone !== undefined) customer.phone = phone.trim();
 
       if (addresses && Array.isArray(addresses)) {
+        // Limit max addresses to prevent storage abuse
+        if (addresses.length > 10) {
+          return res.status(400).json({ error: "Maximum 10 addresses allowed" });
+        }
         const hasDefault = addresses.some((a) => a.isDefault);
         if (addresses.length > 0 && !hasDefault) {
           addresses[0].isDefault = true;

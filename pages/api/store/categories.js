@@ -19,6 +19,7 @@ async function handler(req, res) {
       .populate("parent", "name slug")
       .lean();
 
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
     res.status(200).json(categories);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch categories" });

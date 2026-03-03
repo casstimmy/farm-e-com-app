@@ -15,6 +15,11 @@ async function handler(req, res) {
 
   const { slug } = req.query;
 
+  // Validate slug format to avoid unnecessary DB queries
+  if (!slug || !/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+    return res.status(400).json({ error: "Invalid product slug" });
+  }
+
   try {
     const product = await Product.findOneAndUpdate(
       { slug, isActive: true },

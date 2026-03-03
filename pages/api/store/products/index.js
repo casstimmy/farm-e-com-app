@@ -86,6 +86,7 @@ async function handler(req, res) {
       Product.countDocuments(filter),
     ]);
 
+    res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
     res.status(200).json({
       products,
       pagination: {

@@ -68,9 +68,36 @@ export function StoreProvider({ children }) {
 
   const register = useCallback(async (formData) => {
     const { data } = await axios.post("/api/store/auth/register", formData);
-    localStorage.setItem("storeToken", data.token);
-    localStorage.setItem("storeCustomer", JSON.stringify(data.customer));
-    setCustomer(data.customer);
+    // New flow: registration returns requiresVerification instead of token
+    return data;
+  }, []);
+
+  const verifyEmail = useCallback(async (email, code) => {
+    const { data } = await axios.post("/api/store/auth/verify", { email, code });
+    if (data.token) {
+      localStorage.setItem("storeToken", data.token);
+      localStorage.setItem("storeCustomer", JSON.stringify(data.customer));
+      setCustomer(data.customer);
+    }
+    return data;
+  }, []);
+
+  const forgotPassword = useCallback(async (email) => {
+    const { data } = await axios.post("/api/store/auth/forgot-password", { email });
+    return data;
+  }, []);
+
+  const resetPassword = useCallback(async (email, code, newPassword) => {
+    const { data } = await axios.post("/api/store/auth/reset-password", {
+      email,
+      code,
+      newPassword,
+    });
+    if (data.token) {
+      localStorage.setItem("storeToken", data.token);
+      localStorage.setItem("storeCustomer", JSON.stringify(data.customer));
+      setCustomer(data.customer);
+    }
     return data;
   }, []);
 
@@ -166,6 +193,9 @@ export function StoreProvider({ children }) {
     isAuthenticated: !!customer,
     login,
     register,
+    verifyEmail,
+    forgotPassword,
+    resetPassword,
     logout,
     getAuthHeaders,
 

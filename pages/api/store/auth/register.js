@@ -1,7 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Customer from "@/models/Customer";
-import { generateCustomerToken } from "@/utils/customerAuth";
 import { withRateLimit } from "@/lib/rateLimit";
+import { sendVerificationEmail } from "@/services/emailService";
 
 async function handler(req, res) {
   if (req.method !== "POST") {
@@ -29,28 +29,47 @@ async function handler(req, res) {
 
     const existingCustomer = await Customer.findOne({ email });
     if (existingCustomer) {
+      // If exists but not verified, allow re-sending verification
+      if (!existingCustomer.isVerified) {
+        const code = existingCustomer.generateVerificationToken();
+        await existingCustomer.save();
+
+        // Send verification email (don't block response)
+        sendVerificationEmail(existingCustomer, code).catch((err) =>
+          console.error("Failed to send verification email:", err)
+        );
+
+        return res.status(200).json({
+          message: "A verification code has been sent to your email. Please check your inbox.",
+          requiresVerification: true,
+          email,
+        });
+      }
       return res.status(409).json({ error: "An account with this email already exists" });
     }
 
-    const customer = await Customer.create({
+    const customer = new Customer({
       firstName,
       lastName,
       email,
       password,
       phone,
-      isVerified: true,
+      isVerified: false,
     });
 
-    const token = generateCustomerToken(customer);
+    // Generate verification code
+    const code = customer.generateVerificationToken();
+    await customer.save();
+
+    // Send verification email (don't block response)
+    sendVerificationEmail(customer, code).catch((err) =>
+      console.error("Failed to send verification email:", err)
+    );
+
     return res.status(201).json({
-      token,
-      customer: {
-        id: customer._id,
-        firstName: customer.firstName,
-        lastName: customer.lastName,
-        email: customer.email,
-        phone: customer.phone,
-      },
+      message: "Account created. Please check your email for the verification code.",
+      requiresVerification: true,
+      email,
     });
   } catch (error) {
     if (error.code === 11000) {
