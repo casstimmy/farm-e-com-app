@@ -58,7 +58,18 @@ export default function StoreRegisterPage() {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  if (isAuthenticated) return null;
+  if (isAuthenticated) {
+    return (
+      <StoreLayout>
+        <div className="min-h-[78vh] flex items-center justify-center">
+          <div className="text-center">
+            <FaSpinner className="w-6 h-6 text-green-600 animate-spin mx-auto" />
+            <p className="mt-3 text-sm text-gray-500">Redirecting...</p>
+          </div>
+        </div>
+      </StoreLayout>
+    );
+  }
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -107,8 +118,7 @@ export default function StoreRegisterPage() {
 
     try {
       await verifyEmail(form.email, verificationCode);
-      setLoading(false);
-      await router.push(redirectTarget);
+      // Navigation is handled by the useEffect watching isAuthenticated
     } catch (err) {
       setError(err.response?.data?.error || "Verification failed. Please check the code.");
       setLoading(false);

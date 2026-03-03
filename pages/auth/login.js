@@ -46,7 +46,18 @@ export default function StoreLoginPage() {
     }
   }, [isAuthenticated, redirectTarget, router]);
 
-  if (isAuthenticated) return null;
+  if (isAuthenticated) {
+    return (
+      <StoreLayout>
+        <div className="min-h-[78vh] flex items-center justify-center">
+          <div className="text-center">
+            <FaSpinner className="w-6 h-6 text-green-600 animate-spin mx-auto" />
+            <p className="mt-3 text-sm text-gray-500">Redirecting...</p>
+          </div>
+        </div>
+      </StoreLayout>
+    );
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -54,8 +65,7 @@ export default function StoreLoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      setLoading(false);
-      await router.push(redirectTarget);
+      // Navigation is handled by the useEffect watching isAuthenticated
     } catch (err) {
       const msg = err.response?.data?.error || "Invalid email or password";
       setError(msg);
@@ -97,8 +107,7 @@ export default function StoreLoginPage() {
     setLoading(true);
     try {
       await resetPassword(email, resetCode, newPassword);
-      setLoading(false);
-      await router.push(redirectTarget);
+      // Navigation is handled by the useEffect watching isAuthenticated
     } catch (err) {
       const msg = err.response?.data?.error || "Reset failed. Check your code and try again.";
       setError(msg);
