@@ -33,18 +33,18 @@ async function handler(req, res) {
       Animal.countDocuments({ status: "Sold" }),
       Animal.countDocuments({ status: "Quarantined" }),
       Animal.countDocuments({ isArchived: true }),
-      Animal.countDocuments({ projectedSalesPrice: { $gt: 0 } }),
+      Animal.countDocuments({ $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] }),
       Animal.countDocuments({
         status: "Alive",
         isArchived: { $ne: true },
-        projectedSalesPrice: { $gt: 0 },
+        $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
       }),
       Animal.find({
         status: "Alive",
         isArchived: { $ne: true },
-        projectedSalesPrice: { $gt: 0 },
+        $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
       })
-        .select("tagId name species breed status projectedSalesPrice isArchived createdAt")
+        .select("tagId name species breed status projectedSalesPrice salesPrice isArchived createdAt")
         .limit(5)
         .lean(),
     ]);

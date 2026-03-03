@@ -21,44 +21,54 @@ export async function getServerSideProps({ query }) {
     await import("@/models/Location");
     await dbConnect();
     const { species, breed, gender, sort = "newest", search, page = 1, limit = 20 } = query;
-    const filter = { status: "Alive", isArchived: { $ne: true }, $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] };
+    const filter = { status: "Alive", isArchived: { $ne: true } };
+    
+    // Price filter - must have either salesPrice or projectedSalesPrice
+    const priceFilter = { $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] };
+    
     if (species) filter.species = { $regex: new RegExp(`^${species}$`, "i") };
     if (breed) filter.breed = { $regex: new RegExp(breed, "i") };
     if (gender) filter.gender = gender;
+    
     if (search && search.trim()) {
       const searchRegex = new RegExp(search.trim(), "i");
-      filter.$or = [{ name: searchRegex }, { tagId: searchRegex }, { breed: searchRegex }, { species: searchRegex }];
+      filter.$and = [
+        priceFilter,
+        {
+          $or: [
+            { name: searchRegex },
+            { tagId: searchRegex },
+            { breed: searchRegex },
+            { species: searchRegex },
+          ],
+        },
+      ];
+    } else {
+      Object.assign(filter, priceFilter);
     }
     const sortMap = { newest: { createdAt: -1 }, price_asc: { projectedSalesPrice: 1 }, price_desc: { projectedSalesPrice: -1 }, weight_desc: { currentWeight: -1 }, name_asc: { name: 1 } };
     const sortOption = sortMap[sort] || sortMap.newest;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * perPage;
-    const [animals, totalCount, speciesCounts, allAnimalsCount, aliveCount, salesPriceCount] = await Promise.all([
+    const [animals, totalCount, speciesCounts] = await Promise.all([
       AnimalModel.find(filter).sort(sortOption).skip(skip).limit(perPage)
         .populate("location", "name city state")
         .select("-purchaseCost -totalFeedCost -totalMedicationCost -marginPercent -sire -dam -recordedBy -isArchived -archivedAt -archivedReason")
         .lean(),
       AnimalModel.countDocuments(filter),
       AnimalModel.aggregate([
-        { $match: { status: "Alive", isArchived: { $ne: true }, $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] } },
+        { $match: { status: "Alive", isArchived: { $ne: true }, $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }], species: { $exists: true, $ne: null, $ne: "" } } },
         { $group: { _id: "$species", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
-      AnimalModel.countDocuments({}),
-      AnimalModel.countDocuments({ status: "Alive" }),
-      AnimalModel.countDocuments({ $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] }),
     ]);
     console.log(`[Animals SSR] Filter: ${JSON.stringify(filter)}`);
     console.log(`[Animals SSR] Found ${animals.length} items (page ${pageNum}), total matching: ${totalCount}`);
-    console.log(`[Animals SSR] Database stats - Total: ${allAnimalsCount}, Alive: ${aliveCount}, HasSalesPrice: ${salesPriceCount}`);
-    if (totalCount === 0 && allAnimalsCount > 0) {
-      console.warn(`[Animals SSR] WARNING: Database has ${allAnimalsCount} animals but none match criteria (Alive + HasSalesPrice)`);
-    }
     let breedCounts = [];
     if (species) {
       breedCounts = await AnimalModel.aggregate([
-        { $match: { species: { $regex: new RegExp(`^${species}$`, "i") }, status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } } },
+        { $match: { species: { $regex: new RegExp(`^${species}$`, "i") }, status: "Alive", isArchived: { $ne: true }, $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] } },
         { $group: { _id: "$breed", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]);

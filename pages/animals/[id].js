@@ -286,7 +286,7 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
             <div className="bg-green-50 rounded-xl p-5 mb-6 border border-green-100">
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold text-green-800">
-                  {formatCurrency(animal.projectedSalesPrice, "NGN")}
+                  {formatCurrency(animal.salesPrice || animal.projectedSalesPrice, "NGN")}
                 </span>
               </div>
               <p className="text-sm text-green-600 mt-1">
@@ -333,7 +333,7 @@ export default function AnimalDetailPage({ animal, relatedAnimals }) {
                 <FaShoppingCart className="w-4 h-4" />
               </button>
               <a
-                href={`mailto:store@farm.com?subject=Inquiry: ${animal.name || animal.tagId}&body=Hi, I'm interested in ${animal.name || animal.tagId} (${animal.species}${animal.breed ? ` - ${animal.breed}` : ""}) listed at ${formatCurrency(animal.projectedSalesPrice, "NGN")}`}
+                href={`mailto:store@farm.com?subject=Inquiry: ${animal.name || animal.tagId}&body=Hi, I'm interested in ${animal.name || animal.tagId} (${animal.species}${animal.breed ? ` - ${animal.breed}` : ""}) listed at ${formatCurrency(animal.salesPrice || animal.projectedSalesPrice, "NGN")}`}
                 className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-4 rounded-lg transition-all"
               >
                 <FaEnvelope className="w-4 h-4" />
@@ -437,7 +437,7 @@ export async function getServerSideProps({ params, res }) {
       _id: params.id,
       status: "Alive",
       isArchived: { $ne: true },
-      projectedSalesPrice: { $gt: 0 },
+      $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
     })
       .populate("location", "name city state address")
       .select(
@@ -468,12 +468,12 @@ export async function getServerSideProps({ params, res }) {
       species: animal.species,
       status: "Alive",
       isArchived: { $ne: true },
-      projectedSalesPrice: { $gt: 0 },
+      $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
     })
       .limit(4)
       .populate("location", "name")
       .select(
-        "tagId name species breed gender currentWeight projectedSalesPrice images dob location"
+        "tagId name species breed gender currentWeight projectedSalesPrice salesPrice images dob location"
       )
       .lean();
 

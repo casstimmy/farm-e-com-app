@@ -38,8 +38,10 @@ async function handler(req, res) {
     const filter = {
       status: "Alive",
       isArchived: { $ne: true },
-      $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
     };
+
+    // Core price requirement - must have salesPrice or projectedSalesPrice
+    const priceFilter = { $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }] };
 
     if (species) {
       filter.species = { $regex: new RegExp(`^${species}$`, "i") };
@@ -63,31 +65,49 @@ async function handler(req, res) {
       if (maxWeight) filter.currentWeight.$lte = parseFloat(maxWeight);
     }
 
+    // Build price range filter
+    const priceRangeConditions = [];
     if (minPrice || maxPrice) {
-      // Use $or to match animals where either salesPrice or projectedSalesPrice falls in range
-      const priceFilters = [];
       if (minPrice) {
-        priceFilters.push({ salesPrice: { $gte: parseFloat(minPrice) } });
-        priceFilters.push({ projectedSalesPrice: { $gte: parseFloat(minPrice) } });
+        const minVal = parseFloat(minPrice);
+        priceRangeConditions.push({ salesPrice: { $gte: minVal } });
+        priceRangeConditions.push({ projectedSalesPrice: { $gte: minVal } });
       }
       if (maxPrice) {
-        priceFilters.push({ salesPrice: { $lte: parseFloat(maxPrice) } });
-        priceFilters.push({ projectedSalesPrice: { $lte: parseFloat(maxPrice) } });
-      }
-      if (priceFilters.length > 0) {
-        filter.$or = filter.$or ? { $and: [{ $or: filter.$or }, { $or: priceFilters }] } : { $or: priceFilters };
+        const maxVal = parseFloat(maxPrice);
+        priceRangeConditions.push({ salesPrice: { $lte: maxVal } });
+        priceRangeConditions.push({ projectedSalesPrice: { $lte: maxVal } });
       }
     }
 
+    // Handle search
+    const searchConditions = [];
     if (search && search.trim()) {
       const searchRegex = new RegExp(search.trim(), "i");
-      filter.$or = [
-        { name: searchRegex },
-        { tagId: searchRegex },
-        { breed: searchRegex },
-        { species: searchRegex },
-        { color: searchRegex },
+      searchConditions.push({ name: searchRegex });
+      searchConditions.push({ tagId: searchRegex });
+      searchConditions.push({ breed: searchRegex });
+      searchConditions.push({ species: searchRegex });
+      searchConditions.push({ color: searchRegex });
+    }
+
+    // Combine all conditions properly
+    if (searchConditions.length > 0 && priceRangeConditions.length > 0) {
+      // Both search and price range
+      filter.$and = [
+        priceFilter,
+        { $or: searchConditions },
+        { $or: priceRangeConditions },
       ];
+    } else if (searchConditions.length > 0) {
+      // Only search
+      filter.$and = [priceFilter, { $or: searchConditions }];
+    } else if (priceRangeConditions.length > 0) {
+      // Only price range
+      filter.$and = [priceFilter, { $or: priceRangeConditions }];
+    } else {
+      // Neither search nor price range
+      Object.assign(filter, priceFilter);
     }
 
     const sortMap = {
@@ -123,7 +143,6 @@ async function handler(req, res) {
     console.log(`[Animals API] Filter applied: ${JSON.stringify(filter)}`);
     console.log(`[Animals API] Results: ${animals.length} items returned`);
     console.log(`[Animals API] Filtered count (matching all criteria): ${totalCount}`);
-    console.log(`[Animals API] Database stats - Total: ${allAnimalsCount}, Alive: ${aliveCount}, HasSalesPrice: ${salesPriceCount}`);
     if (animals.length === 0 && totalCount === 0) {
       console.warn(`[Animals API] WARNING: No animals match the filter! Check if database is populated.`);
     }
@@ -134,7 +153,8 @@ async function handler(req, res) {
         $match: {
           status: "Alive",
           isArchived: { $ne: true },
-          projectedSalesPrice: { $gt: 0 },
+          $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
+          species: { $exists: true, $ne: null, $ne: "" },
         },
       },
       {
@@ -155,7 +175,7 @@ async function handler(req, res) {
             species: { $regex: new RegExp(`^${species}$`, "i") },
             status: "Alive",
             isArchived: { $ne: true },
-            projectedSalesPrice: { $gt: 0 },
+            $or: [{ salesPrice: { $gt: 0 } }, { projectedSalesPrice: { $gt: 0 } }],
           },
         },
         {
