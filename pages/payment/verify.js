@@ -13,6 +13,7 @@ export default function PaymentVerifyPage() {
   const [status, setStatus] = useState("verifying"); // verifying | success | failed
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
+  const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
 
   useEffect(() => {
     if (!reference) return;
@@ -37,6 +38,19 @@ export default function PaymentVerifyPage() {
 
     verify();
   }, [reference]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+
+    const targetBase = appBaseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+    if (!targetBase) return;
+
+    const timeout = setTimeout(() => {
+      window.location.assign(`${targetBase}/account/orders`);
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [status, appBaseUrl]);
 
   return (
     <StoreLayout>
@@ -83,14 +97,22 @@ export default function PaymentVerifyPage() {
               )}
               <div className="flex flex-col gap-3">
                 <button
-                  onClick={() => router.push("/account/orders")}
+                  onClick={() =>
+                    appBaseUrl
+                      ? window.location.assign(`${appBaseUrl}/account/orders`)
+                      : router.push("/account/orders")
+                  }
                   className="flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
                 >
                   <FaReceipt className="w-4 h-4" />
                   View My Orders
                 </button>
                 <button
-                  onClick={() => router.push("/")}
+                  onClick={() =>
+                    appBaseUrl
+                      ? window.location.assign(`${appBaseUrl}/`)
+                      : router.push("/")
+                  }
                   className="flex items-center justify-center gap-2 w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 rounded-lg transition-all"
                 >
                   <FaHome className="w-4 h-4" />

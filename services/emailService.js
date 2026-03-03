@@ -11,6 +11,8 @@ const BUSINESS_NOTIFICATION_EMAIL = process.env.BUSINESS_NOTIFICATION_EMAIL?.tri
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Farm Fresh Store";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://farm-e-com-app.vercel.app";
 const ADMIN_APP_URL = process.env.ADMIN_APP_URL || "https://farm-health-app.vercel.app";
+const CUSTOMER_ORDERS_URL = `${APP_URL.replace(/\/$/, "")}/account/orders`;
+const ADMIN_ORDERS_URL = `${ADMIN_APP_URL.replace(/\/$/, "")}/manage/orders`;
 
 if (!EMAIL_USER || !EMAIL_PASS) {
   console.warn("⚠️  Email credentials not configured. Email service will not work.");
@@ -139,7 +141,7 @@ export async function sendOrderConfirmationEmail(order, customer) {
         <div class="content">
           <p style="font-size: 16px; margin-bottom: 20px;">
             Hi ${safeFirstName},<br>
-            Your order has been confirmed and is being processed. Below are the details of your order.
+            Thank you for shopping with ${APP_NAME}. Your order is confirmed and our team has started processing it.
           </p>
 
           <div class="order-info">
@@ -194,10 +196,10 @@ export async function sendOrderConfirmationEmail(order, customer) {
           </div>
 
           <p style="margin-top: 30px; color: #666; font-size: 14px;">
-            You can track your order status at any time by visiting your account page.
+            You can check delivery progress and payment status anytime from your orders page.
           </p>
 
-          <a href="${APP_URL}/account/orders" class="cta-button">View Account Orders</a>
+          <a href="${CUSTOMER_ORDERS_URL}" class="cta-button">Track My Order</a>
 
           <p style="margin-top: 30px; font-size: 13px; color: #999;">
             If you have any questions, please contact our support team.<br>
@@ -218,7 +220,7 @@ export async function sendOrderConfirmationEmail(order, customer) {
     await getTransporter().sendMail({
       from: `"${APP_NAME}" <${EMAIL_USER}>`,
       to: customer.email,
-      subject: `Order Confirmation - #${orderNumber}`,
+      subject: `${safeFirstName}, your order #${orderNumber} is confirmed ✅`,
       html,
     });
     console.log(`Order confirmation email sent to ${customer.email}`);
@@ -599,10 +601,13 @@ export async function sendNewOrderNotificationToAdmin(order, customer) {
     <body style="font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
       <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: #16a34a; color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 22px;">🛒 New Order Received</h1>
-          <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Order #${safeOrderNumber}</p>
+          <h1 style="margin: 0; font-size: 22px;">🛒 New Customer Order Alert</h1>
+          <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Order #${safeOrderNumber} is ready for review</p>
         </div>
         <div style="background: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0 0 14px 0; font-size: 14px; color: #4b5563;">
+            Hello Team, a new order was placed on ${APP_NAME}. Please review and process it from the admin dashboard.
+          </p>
           <div style="background: white; padding: 16px; border-radius: 6px; margin-bottom: 16px; border-left: 4px solid #16a34a;">
             <h3 style="margin: 0 0 8px 0; color: #16a34a;">Order Summary</h3>
             <p style="margin: 4px 0; font-size: 14px;"><strong>Date:</strong> ${new Date(createdAt).toLocaleString("en-NG")}</p>
@@ -630,7 +635,7 @@ export async function sendNewOrderNotificationToAdmin(order, customer) {
           </table>
 
           <div style="text-align: center; margin-top: 20px;">
-            <a href="${ADMIN_APP_URL}/manage/orders" style="display: inline-block; background: #16a34a; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">View in Admin Dashboard</a>
+            <a href="${ADMIN_ORDERS_URL}" style="display: inline-block; background: #16a34a; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Open Admin Order Queue</a>
           </div>
         </div>
       </div>
@@ -642,7 +647,7 @@ export async function sendNewOrderNotificationToAdmin(order, customer) {
     await getTransporter().sendMail({
       from: `"${APP_NAME}" <${EMAIL_USER}>`,
       to: businessEmail,
-      subject: `New Order #${orderNumber} - ₦${(total || 0).toLocaleString()} from ${customer.firstName} ${customer.lastName}`,
+      subject: `Admin Alert: New order #${orderNumber} from ${customer.firstName} ${customer.lastName}`,
       html,
     });
     console.log(`Admin order notification sent to ${businessEmail}`);

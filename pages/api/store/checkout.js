@@ -106,8 +106,9 @@ async function handler(req, res) {
     }
 
     if (paymentMethod === "Paystack") {
-      // Use Web_Place's own URL for Paystack callback
-      const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/payment/verify`;
+      // Use configured app URL for Paystack callback
+      const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001").replace(/\/$/, "");
+      const callbackUrl = `${appBaseUrl}/payment/verify`;
 
       try {
         const payment = await initializePayment({
