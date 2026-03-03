@@ -1,6 +1,5 @@
 import dbConnect from "@/lib/mongodb";
 import Customer from "@/models/Customer";
-import bcrypt from "bcryptjs";
 import { generateCustomerToken } from "@/utils/customerAuth";
 import { withRateLimit } from "@/lib/rateLimit";
 
@@ -33,14 +32,11 @@ async function handler(req, res) {
       return res.status(409).json({ error: "An account with this email already exists" });
     }
 
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     const customer = await Customer.create({
       firstName,
       lastName,
       email,
-      password: hashedPassword,
+      password,
       phone,
       isVerified: true,
     });

@@ -1,6 +1,5 @@
 import dbConnect from "@/lib/mongodb";
 import Customer from "@/models/Customer";
-import bcrypt from "bcryptjs";
 import { generateCustomerToken } from "@/utils/customerAuth";
 import { withRateLimit } from "@/lib/rateLimit";
 
@@ -28,7 +27,7 @@ async function handler(req, res) {
       return res.status(403).json({ error: "Your account has been deactivated" });
     }
 
-    const isMatch = await bcrypt.compare(password, customer.password);
+    const isMatch = await customer.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid email or password" });
     }

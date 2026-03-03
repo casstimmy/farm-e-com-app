@@ -14,14 +14,35 @@ if (!EMAIL_USER || !EMAIL_PASS) {
   console.warn("Email credentials not configured. Email service will not work.");
 }
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
-});
+/**
+ * Escape HTML special characters to prevent XSS in email templates
+ */
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Lazy-initialize transporter only when needed
+let _transporter = null;
+function getTransporter() {
+  if (_transporter) return _transporter;
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    throw new Error("Email credentials not configured");
+  }
+  _transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+  });
+  return _transporter;
+}
 
 /**
  * Verify transporter connection (optional, useful for debugging)
@@ -29,7 +50,7 @@ const transporter = nodemailer.createTransport({
 export async function verifyEmailConnection() {
   if (!EMAIL_USER || !EMAIL_PASS) return false;
   try {
-    await transporter.verify();
+    await getTransporter().verify();
     console.log("Email service ready");
     return true;
   } catch (error) {
@@ -44,11 +65,22 @@ export async function verifyEmailConnection() {
 export async function sendOrderConfirmationEmail(order, customer) {
   const { orderNumber, total, items, shippingAddress, createdAt } = order;
   
+  // Escape user-provided data
+  const safeFirstName = escapeHtml(customer.firstName);
+  const safeLastName = escapeHtml(customer.lastName);
+  const safePhone = escapeHtml(customer.phone);
+  const safeOrderNumber = escapeHtml(orderNumber);
+  const safeStreet = escapeHtml(shippingAddress?.street);
+  const safeCity = escapeHtml(shippingAddress?.city);
+  const safeState = escapeHtml(shippingAddress?.state);
+  const safePostalCode = escapeHtml(shippingAddress?.postalCode);
+  const safeCountry = escapeHtml(shippingAddress?.country);
+
   const itemsList = items
     .map(
       (item) =>
         `<tr>
-          <td style="padding: 12px; border-bottom: 1px solid #eee;">${item.name}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee;">${escapeHtml(item.name)}</td>
           <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
           <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">₦${item.price.toLocaleString()}</td>
           <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">₦${item.lineTotal.toLocaleString()}</td>
@@ -96,7 +128,7 @@ export async function sendOrderConfirmationEmail(order, customer) {
         
         <div class="content">
           <p style="font-size: 16px; margin-bottom: 20px;">
-            Hi ${customer.firstName},<br>
+            Hi ${safeFirstName},<br>
             Your order has been confirmed and is being processed. Below are the details of your order.
           </p>
 
@@ -105,7 +137,7 @@ export async function sendOrderConfirmationEmail(order, customer) {
             <div class="order-details">
               <div class="detail-item">
                 <div class="detail-label">Order Number</div>
-                <div class="detail-value">#${orderNumber}</div>
+                <div class="detail-value">#${safeOrderNumber}</div>
               </div>
               <div class="detail-item">
                 <div class="detail-label">Order Date</div>
@@ -143,11 +175,11 @@ export async function sendOrderConfirmationEmail(order, customer) {
           <div class="shipping-address">
             <h4>Shipping Address</h4>
             <div class="address-text">
-              ${customer.firstName} ${customer.lastName}<br>
-              ${shippingAddress.street}<br>
-              ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}<br>
-              ${shippingAddress.country}<br>
-              📞 ${customer.phone || "Not provided"}
+              ${safeFirstName} ${safeLastName}<br>
+              ${safeStreet}<br>
+              ${safeCity}, ${safeState} ${safePostalCode}<br>
+              ${safeCountry}<br>
+              📞 ${safePhone || "Not provided"}
             </div>
           </div>
 
@@ -173,7 +205,7 @@ export async function sendOrderConfirmationEmail(order, customer) {
   `;
 
   try {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: `"${APP_NAME}" <${EMAIL_USER}>`,
       to: customer.email,
       subject: `Order Confirmation - #${orderNumber}`,
@@ -192,8 +224,10 @@ export async function sendOrderConfirmationEmail(order, customer) {
  */
 export async function sendShipmentNotificationEmail(order, customer, trackingInfo) {
   const { orderNumber, items } = order;
+  const safeFirstName = escapeHtml(customer.firstName);
+  const safeOrderNumber = escapeHtml(orderNumber);
   const itemsList = items
-    .map((item) => `<li>${item.name} (x${item.quantity})</li>`)
+    .map((item) => `<li>${escapeHtml(item.name)} (x${item.quantity})</li>`)
     .join("");
 
   const html = `
@@ -216,14 +250,14 @@ export async function sendShipmentNotificationEmail(order, customer, trackingInf
           <h1>📦 Your Order Has Shipped!</h1>
         </div>
         <div class="content">
-          <p>Hi ${customer.firstName},</p>
-          <p>Great news! Your order #${orderNumber} is on its way to you.</p>
+          <p>Hi ${safeFirstName},</p>
+          <p>Great news! Your order #${safeOrderNumber} is on its way to you.</p>
           
           <div class="tracking-box">
             <h3 style="margin-top: 0;">Tracking Information</h3>
             <p><strong>Tracking Number:</strong></p>
-            <div class="tracking-number">${trackingInfo?.trackingNumber || "N/A"}</div>
-            ${trackingInfo?.estimatedDelivery ? `<p><strong>Estimated Delivery:</strong> ${trackingInfo.estimatedDelivery}</p>` : ""}
+            <div class="tracking-number">${escapeHtml(trackingInfo?.trackingNumber) || "N/A"}</div>
+            ${trackingInfo?.estimatedDelivery ? `<p><strong>Estimated Delivery:</strong> ${escapeHtml(trackingInfo.estimatedDelivery)}</p>` : ""}
           </div>
 
           <h4>Items in this shipment:</h4>
@@ -238,7 +272,7 @@ export async function sendShipmentNotificationEmail(order, customer, trackingInf
   `;
 
   try {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: `"${APP_NAME}" <${EMAIL_USER}>`,
       to: customer.email,
       subject: `Your Order #${orderNumber} Has Shipped - Tracking Info Included`,
@@ -256,7 +290,9 @@ export async function sendShipmentNotificationEmail(order, customer, trackingInf
  * Send order delivery confirmation
  */
 export async function sendDeliveryConfirmationEmail(order, customer) {
-  const { orderNumber, total } = order;
+  const { orderNumber } = order;
+  const safeFirstName = escapeHtml(customer.firstName);
+  const safeOrderNumber = escapeHtml(orderNumber);
 
   const html = `
     <!DOCTYPE html>
@@ -279,12 +315,12 @@ export async function sendDeliveryConfirmationEmail(order, customer) {
           <h1>✓ Delivery Confirmed</h1>
         </div>
         <div class="content">
-          <p>Hi ${customer.firstName},</p>
+          <p>Hi ${safeFirstName},</p>
           <p>Your order has been delivered successfully!</p>
           
           <div class="success-box">
             <div class="success-icon">✓</div>
-            <h2 style="color: #10b981; margin: 0;">Order #${orderNumber}</h2>
+            <h2 style="color: #10b981; margin: 0;">Order #${safeOrderNumber}</h2>
             <p style="color: #666; margin: 5px 0;">Delivery complete</p>
           </div>
 
@@ -303,7 +339,7 @@ export async function sendDeliveryConfirmationEmail(order, customer) {
   `;
 
   try {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: `"${APP_NAME}" <${EMAIL_USER}>`,
       to: customer.email,
       subject: `Your Order #${orderNumber} Has Been Delivered`,
@@ -340,7 +376,7 @@ export async function sendWelcomeEmail(customer) {
           <h1>Welcome to ${APP_NAME}!</h1>
         </div>
         <div class="content">
-          <p>Hi ${customer.firstName},</p>
+          <p>Hi ${escapeHtml(customer.firstName)},</p>
           <p>Welcome to ${APP_NAME}! We're excited to have you on board.</p>
           
           <h3>Here's what you can do:</h3>
@@ -368,7 +404,7 @@ export async function sendWelcomeEmail(customer) {
   `;
 
   try {
-    await transporter.sendMail({
+    await getTransporter().sendMail({
       from: `"${APP_NAME}" <${EMAIL_USER}>`,
       to: customer.email,
       subject: `Welcome to ${APP_NAME}!`,
@@ -382,4 +418,4 @@ export async function sendWelcomeEmail(customer) {
   }
 }
 
-export default transporter;
+export default { getTransporter, verifyEmailConnection };

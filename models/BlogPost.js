@@ -26,7 +26,6 @@ const BlogPostSchema = new mongoose.Schema(
     content: { 
       type: String, 
       default: "",
-      minlength: 50
     },
     coverImage: { 
       type: String, 
@@ -92,10 +91,15 @@ BlogPostSchema.index({ showOnSite: 1, publishedAt: -1 });
 BlogPostSchema.index({ isFeatured: 1, publishedAt: -1 });
 BlogPostSchema.index({ category: 1, status: 1 });
 
-// Pre-save hook to auto-publish if scheduled
+// Pre-save hook to auto-publish if scheduled and validate content for published posts
 BlogPostSchema.pre("save", function(next) {
-  if (this.status === "Published" && !this.publishedAt) {
-    this.publishedAt = new Date();
+  if (this.status === "Published") {
+    if (!this.publishedAt) {
+      this.publishedAt = new Date();
+    }
+    if (!this.content || this.content.length < 50) {
+      return next(new Error("Published posts must have at least 50 characters of content"));
+    }
   }
   next();
 });

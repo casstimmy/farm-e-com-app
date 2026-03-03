@@ -27,8 +27,13 @@ export async function validateCartForCheckout(cartItems) {
   const errors = [];
   const resolvedItems = [];
 
+  // Batch-fetch all products at once to avoid N+1 queries
+  const productIds = cartItems.map((item) => item.product);
+  const products = await Product.find({ _id: { $in: productIds } }).lean();
+  const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
   for (const cartItem of cartItems) {
-    const product = await Product.findById(cartItem.product);
+    const product = productMap.get(cartItem.product.toString());
 
     if (!product || !product.isActive) {
       errors.push({ product: cartItem.product, reason: "Product not available" });
@@ -130,11 +135,15 @@ export async function confirmOrderPayment(orderId) {
     $inc: { orderCount: 1, totalSpent: order.total },
   });
 
-  // Increment product sales counters
-  for (const item of order.items) {
-    await Product.findByIdAndUpdate(item.product, {
-      $inc: { salesCount: item.quantity },
-    });
+  // Batch-increment product sales counters
+  const bulkOps = order.items.map((item) => ({
+    updateOne: {
+      filter: { _id: item.product },
+      update: { $inc: { salesCount: item.quantity } },
+    },
+  }));
+  if (bulkOps.length > 0) {
+    await Product.bulkWrite(bulkOps);
   }
 
   // Send order confirmation email
@@ -154,7 +163,15 @@ export async function confirmOrderPayment(orderId) {
 const ALLOWED_TRANSITIONS = {
   Pending: ["Paid", "Cancelled"],
   Paid: ["Processing", "Cancelled", "Refunded"],
-  Processing: ["Shipped", "Cancelled"],.populate("customer");
+  Processing: ["Shipped", "Cancelled"],
+  Shipped: ["Delivered"],
+  Delivered: [],
+  Cancelled: [],
+  Refunded: [],
+};
+
+export async function updateOrderStatus(orderId, newStatus, { note, changedBy } = {}) {
+  const order = await Order.findById(orderId).populate("customer");
   if (!order) throw new Error("Order not found");
 
   const allowed = ALLOWED_TRANSITIONS[order.status];
@@ -188,24 +205,15 @@ const ALLOWED_TRANSITIONS = {
     if (newStatus === "Shipped") {
       await sendShipmentNotificationEmail(order.toObject(), order.customer, {
         trackingNumber: note || "To be provided",
-        estimatedDelivery: "3-5 business days"
+        estimatedDelivery: "3-5 business days",
       });
     } else if (newStatus === "Delivered") {
       await sendDeliveryConfirmationEmail(order.toObject(), order.customer);
     }
   } catch (emailError) {
     console.error("Failed to send status update email:", emailError);
-    // Don't fail the entire process if email fails
   }
 
-  if (newStatus === "Cancelled") {
-    order.cancellationReason = note || "";
-    if (order.inventoryDeducted) {
-      await restoreInventoryForOrder(orderId);
-    }
-  }
-
-  await order.save();
   return order;
 }
 

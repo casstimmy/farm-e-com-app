@@ -1,5 +1,6 @@
 import Transaction from "@/models/Transaction";
 import { confirmOrderPayment } from "./orderService";
+import crypto from "crypto";
 
 /**
  * Payment Service
@@ -174,11 +175,17 @@ export async function handlePaystackWebhook(event) {
 export function verifyWebhookSignature(body, signature) {
   if (!PAYSTACK_SECRET_KEY || !signature) return false;
 
-  const crypto = require("crypto");
   const hash = crypto
     .createHmac("sha512", PAYSTACK_SECRET_KEY)
     .update(body)
     .digest("hex");
 
-  return hash === signature;
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(hash, "utf8"),
+      Buffer.from(signature, "utf8")
+    );
+  } catch {
+    return false;
+  }
 }

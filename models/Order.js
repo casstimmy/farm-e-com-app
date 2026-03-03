@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
 
 const OrderItemSchema = new mongoose.Schema(
   {
@@ -120,17 +121,18 @@ OrderSchema.index({ status: 1, createdAt: -1 });
 OrderSchema.index({ paymentStatus: 1 });
 OrderSchema.index({ customerEmail: 1 });
 
-// Generate order number before saving
+// Generate collision-resistant order number before saving
 OrderSchema.pre("validate", async function () {
   if (this.isNew && !this.orderNumber) {
     const datePart = new Date()
       .toISOString()
       .slice(2, 10)
       .replace(/-/g, "");
-    const randomPart = Math.random()
-      .toString(36)
-      .substring(2, 7)
-      .toUpperCase();
+    const randomPart = crypto
+      .randomBytes(4)
+      .toString("hex")
+      .toUpperCase()
+      .slice(0, 6);
     this.orderNumber = `ORD-${datePart}-${randomPart}`;
   }
 });

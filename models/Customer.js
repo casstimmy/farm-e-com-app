@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const AddressSchema = new mongoose.Schema(
   {
@@ -52,7 +53,23 @@ const CustomerSchema = new mongoose.Schema(
 CustomerSchema.index({ email: 1 }, { unique: true });
 CustomerSchema.index({ isActive: 1, createdAt: -1 });
 CustomerSchema.index({ firstName: 1, lastName: 1 });
-CustomerSchema.index({ location: 1 });
+
+// Hash password before saving
+CustomerSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  try {
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Compare submitted password with stored hash
+CustomerSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
 
 CustomerSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;

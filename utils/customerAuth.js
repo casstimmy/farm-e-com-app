@@ -31,6 +31,10 @@ export function verifyCustomerToken(token) {
     return decoded;
   } catch (error) {
     console.debug("Token verification failed:", error.message);
+    return null;
+  }
+}
+
 /**
  * Extract Bearer token from the Authorization header.
  */

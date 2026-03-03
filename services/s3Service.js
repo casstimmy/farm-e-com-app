@@ -16,14 +16,22 @@ if (!S3_ACCESS_KEY || !S3_SECRET_ACCESS_KEY) {
   console.warn("AWS S3 credentials not configured. Image uploads will be disabled.");
 }
 
-// Initialize S3 client
-const s3Client = new S3Client({
-  region: S3_REGION,
-  credentials: {
-    accessKeyId: S3_ACCESS_KEY,
-    secretAccessKey: S3_SECRET_ACCESS_KEY,
-  },
-});
+// Lazy-initialize S3 client
+let _s3Client = null;
+function getS3Client() {
+  if (_s3Client) return _s3Client;
+  if (!S3_ACCESS_KEY || !S3_SECRET_ACCESS_KEY) {
+    throw new Error("S3 credentials not configured");
+  }
+  _s3Client = new S3Client({
+    region: S3_REGION,
+    credentials: {
+      accessKeyId: S3_ACCESS_KEY,
+      secretAccessKey: S3_SECRET_ACCESS_KEY,
+    },
+  });
+  return _s3Client;
+}
 
 /**
  * Generate a unique file name for S3
@@ -63,7 +71,7 @@ export async function uploadImageToS3(fileBuffer, fileName, category, mimeType =
       },
     });
 
-    await s3Client.send(command);
+    await getS3Client().send(command);
     const url = `${S3_URL}/${key}`;
 
     return { url, key, fileName };
@@ -90,7 +98,7 @@ export async function getSignedS3Url(key, expiresIn = 3600) {
       Key: key,
     });
 
-    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    const url = await getSignedUrl(getS3Client(), command, { expiresIn });
     return url;
   } catch (error) {
     console.error("Signed URL generation error:", error);
@@ -114,7 +122,7 @@ export async function deleteImageFromS3(key) {
       Key: key,
     });
 
-    await s3Client.send(command);
+    await getS3Client().send(command);
     return true;
   } catch (error) {
     console.error("S3 delete error:", error);

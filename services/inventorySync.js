@@ -28,21 +28,31 @@ export async function deductInventoryForOrder(orderId) {
     if (!item.inventoryItem) continue;
 
     try {
-      const inv = await Inventory.findById(item.inventoryItem);
+      // Use atomic $inc to avoid race conditions
+      const inv = await Inventory.findByIdAndUpdate(
+        item.inventoryItem,
+        {
+          $inc: { quantity: -item.quantity, totalConsumed: item.quantity },
+        },
+        { new: true }
+      );
+
       if (!inv) {
         errors.push({ product: item.name, reason: "Inventory item not found" });
         continue;
       }
 
-      const newQty = Math.max(0, inv.quantity - item.quantity);
-      inv.quantity = newQty;
-      inv.totalConsumed = (inv.totalConsumed || 0) + item.quantity;
-      await inv.save();
+      // Clamp to zero if it went negative
+      if (inv.quantity < 0) {
+        await Inventory.findByIdAndUpdate(item.inventoryItem, {
+          $set: { quantity: 0 },
+        });
+      }
 
       // Update local Product stock cache
       await Product.updateMany(
         { inventoryItem: item.inventoryItem },
-        { $set: { stockQuantity: newQty } }
+        { $set: { stockQuantity: Math.max(0, inv.quantity) } }
       );
     } catch (err) {
       errors.push({ product: item.name, reason: err.message });
@@ -69,12 +79,23 @@ export async function restoreInventoryForOrder(orderId) {
     if (!item.inventoryItem) continue;
 
     try {
-      const inv = await Inventory.findById(item.inventoryItem);
+      // Use atomic $inc to restore stock
+      const inv = await Inventory.findByIdAndUpdate(
+        item.inventoryItem,
+        {
+          $inc: { quantity: item.quantity, totalConsumed: -item.quantity },
+        },
+        { new: true }
+      );
+
       if (!inv) continue;
 
-      inv.quantity += item.quantity;
-      inv.totalConsumed = Math.max(0, (inv.totalConsumed || 0) - item.quantity);
-      await inv.save();
+      // Clamp totalConsumed to zero
+      if (inv.totalConsumed < 0) {
+        await Inventory.findByIdAndUpdate(item.inventoryItem, {
+          $set: { totalConsumed: 0 },
+        });
+      }
 
       // Update local Product stock cache
       await Product.updateMany(
@@ -110,7 +131,7 @@ export async function createSalesFinanceRecord(order) {
       title: `Online Order #${order.orderNumber}`,
       description: `${order.items.length} item(s) — ${order.customerName} (${order.customerEmail})`,
       amount: order.total,
-      paymentMethod: order.paymentMethod === "paystack" ? "Bank Transfer" : "Cash",
+      paymentMethod: order.paymentMethod === "Paystack" ? "Bank Transfer" : "Cash",
       status: "Completed",
       notes: `Subtotal: ${order.subtotal}, Shipping: ${order.shippingCost || 0}, COGS: ${costOfGoods}`,
     });
