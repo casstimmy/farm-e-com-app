@@ -27,7 +27,7 @@ export async function getStaticProps() {
       props: {
         initialData: JSON.parse(JSON.stringify(featuredData)),
       },
-      revalidate: 60,
+      revalidate: 30,
     };
   } catch (error) {
     console.error("Homepage static data error:", error);

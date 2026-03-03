@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { formatCurrency } from "@/utils/formatting";
 import { FaWeight, FaVenusMars, FaPaw, FaMapMarkerAlt, FaShoppingCart, FaSpinner } from "react-icons/fa";
+import { useStore } from "@/context/StoreContext";
 
 /**
  * AnimalCard — Rich product card for livestock listings.
@@ -9,6 +10,7 @@ import { FaWeight, FaVenusMars, FaPaw, FaMapMarkerAlt, FaShoppingCart, FaSpinner
  */
 export default function AnimalCard({ animal, currency = "NGN", onAddToCart = null }) {
   const [adding, setAdding] = useState(false);
+  const { businessSettings } = useStore();
   const primaryImage =
     animal.images?.[0]?.thumb || animal.images?.[0]?.full || null;
 
@@ -155,7 +157,7 @@ export default function AnimalCard({ animal, currency = "NGN", onAddToCart = nul
           {/* Price */}
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-lg font-bold text-gray-900">
-              {formatCurrency(animal.projectedSalesPrice, currency)}
+              {(animal.salesPrice || animal.projectedSalesPrice) ? formatCurrency(animal.salesPrice || animal.projectedSalesPrice, businessSettings?.currency || currency) : "Set price"}
             </span>
           </div>
 

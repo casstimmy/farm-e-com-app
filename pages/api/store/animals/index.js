@@ -97,7 +97,7 @@ async function handler(req, res) {
     const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * perPage;
 
-    const [animals, totalCount] = await Promise.all([
+    const [animals, totalCount, allAnimalsCount, aliveCount, salesPriceCount] = await Promise.all([
       Animal.find(filter)
         .sort(sortOption)
         .skip(skip)
@@ -107,6 +107,9 @@ async function handler(req, res) {
         .lean()
         .exec(),
       Animal.countDocuments(filter),
+      Animal.countDocuments({}),  // Total animals in DB
+      Animal.countDocuments({ status: "Alive" }),  // Alive animals
+      Animal.countDocuments({ projectedSalesPrice: { $gt: 0 } }),  // Animals with sales price
     ]);
 
     // Debug logging

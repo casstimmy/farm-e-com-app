@@ -1,7 +1,6 @@
 import dbConnect from "@/lib/mongodb";
 import BusinessSettings from "@/models/BusinessSettings";
 import { withRateLimit } from "@/lib/rateLimit";
-import { withCache } from "@/lib/apiCache";
 
 /**
  * Public Business Settings API
@@ -9,7 +8,6 @@ import { withCache } from "@/lib/apiCache";
  *
  * Returns public-facing business information (name, logo, contact).
  * No auth required — used by store layout.
- * Cached in-memory for 5 minutes to avoid DB hits on every page load.
  */
 async function handler(req, res) {
   if (req.method !== "GET") {
@@ -19,12 +17,11 @@ async function handler(req, res) {
   await dbConnect();
 
   try {
-    const settings = await withCache("business-settings", 300, async () => {
-      return await BusinessSettings.findOne()
-        .select("businessName businessLogo businessEmail businessPhone businessAddress businessDescription loginHeroImage currency")
-        .lean();
-    });
+    const settings = await BusinessSettings.findOne()
+      .select("businessName businessLogo businessEmail businessPhone businessAddress businessDescription loginHeroImage currency")
+      .lean();
 
+    // Cache for 5 minutes
     res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
 
     res.status(200).json(settings || {

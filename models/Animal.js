@@ -43,6 +43,7 @@ const AnimalSchema = new mongoose.Schema(
     purchaseCost: { type: Number, default: 0 },
     marginPercent: { type: Number, default: 30 },
     projectedSalesPrice: { type: Number, default: 0 },
+    salesPrice: { type: Number, default: 0 },
     totalFeedCost: { type: Number, default: 0 },
     totalMedicationCost: { type: Number, default: 0 },
     images: [

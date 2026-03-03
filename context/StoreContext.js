@@ -34,24 +34,9 @@ export function StoreProvider({ children }) {
     }
     setAuthLoading(false);
 
-    // Fetch business settings — use sessionStorage to avoid hitting the API on every page load
-    try {
-      const cached = sessionStorage.getItem("businessSettings");
-      const cachedAt = sessionStorage.getItem("businessSettingsAt");
-      if (cached && cachedAt && Date.now() - Number(cachedAt) < 5 * 60 * 1000) {
-        setBusinessSettings(JSON.parse(cached));
-        return;
-      }
-    } catch {}
-
+    // Fetch business settings (public, no auth needed)
     axios.get("/api/store/settings")
-      .then(({ data }) => {
-        setBusinessSettings(data);
-        try {
-          sessionStorage.setItem("businessSettings", JSON.stringify(data));
-          sessionStorage.setItem("businessSettingsAt", String(Date.now()));
-        } catch {}
-      })
+      .then(({ data }) => setBusinessSettings(data))
       .catch(() => {});
   }, []);
 
