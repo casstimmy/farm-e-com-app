@@ -7,8 +7,6 @@ import { formatCurrency } from "@/utils/formatting";
 import {
   FaLock,
   FaCreditCard,
-  FaUniversity,
-  FaTruck,
   FaSpinner,
   FaChevronLeft,
 } from "react-icons/fa";
@@ -18,7 +16,6 @@ export default function CheckoutPage() {
   const { cart, isAuthenticated, getAuthHeaders, customer, fetchCart } = useStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("Paystack");
 
   const [shippingAddress, setShippingAddress] = useState({
     street: "",
@@ -108,13 +105,12 @@ export default function CheckoutPage() {
         "/api/store/checkout",
         {
           shippingAddress,
-          paymentMethod,
           notes,
         },
         { headers: getAuthHeaders() }
       );
 
-      if (paymentMethod === "Paystack" && data.payment?.authorizationUrl) {
+      if (data.payment?.authorizationUrl) {
         // Redirect to Paystack checkout
         window.location.href = data.payment.authorizationUrl;
       } else if (data.paymentError) {
@@ -125,7 +121,6 @@ export default function CheckoutPage() {
         );
       } else {
         await fetchCart();
-        // Order placed — redirect to confirmation
         router.push(
           `/order-confirmation?order=${data.order.orderNumber}`
         );
@@ -138,27 +133,6 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
-
-  const paymentMethods = [
-    {
-      id: "Paystack",
-      label: "Pay with Card (Paystack)",
-      icon: <FaCreditCard className="w-4 h-4" />,
-      description: "Secure card payment via Paystack",
-    },
-    {
-      id: "Bank Transfer",
-      label: "Bank Transfer",
-      icon: <FaUniversity className="w-4 h-4" />,
-      description: "Transfer to our bank account",
-    },
-    {
-      id: "Cash on Delivery",
-      label: "Cash on Delivery",
-      icon: <FaTruck className="w-4 h-4" />,
-      description: "Pay when you receive your order",
-    },
-  ];
 
   return (
     <StoreLayout>
@@ -254,53 +228,22 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Payment method */}
+              {/* Payment method — Paystack only */}
               <div className="bg-white rounded-xl border border-gray-100 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
                   Payment Method
                 </h2>
-                <div className="space-y-3">
-                  {paymentMethods.map((method) => (
-                    <label
-                      key={method.id}
-                      className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        paymentMethod === method.id
-                          ? "border-green-600 bg-green-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value={method.id}
-                        checked={paymentMethod === method.id}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          paymentMethod === method.id
-                            ? "border-green-600"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {paymentMethod === method.id && (
-                          <div className="w-2.5 h-2.5 bg-green-600 rounded-full" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-700">
-                        {method.icon}
-                        <div>
-                          <span className="text-sm font-semibold block">
-                            {method.label}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {method.description}
-                          </span>
-                        </div>
-                      </div>
-                    </label>
-                  ))}
+                <div className="flex items-center gap-3 p-4 rounded-lg border-2 border-green-600 bg-green-50">
+                  <div className="w-5 h-5 rounded-full border-2 border-green-600 flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-green-600 rounded-full" />
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <FaCreditCard className="w-4 h-4" />
+                    <div>
+                      <span className="text-sm font-semibold block">Pay with Card (Paystack)</span>
+                      <span className="text-xs text-gray-500">Secure card payment via Paystack</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -391,9 +334,7 @@ export default function CheckoutPage() {
                   )}
                   {loading
                     ? "Processing..."
-                    : paymentMethod === "Paystack"
-                      ? `Pay ${formatCurrency(cart.subtotal, "NGN")}`
-                      : "Place Order"}
+                    : `Pay ${formatCurrency(cart.subtotal, "NGN")}`}
                 </button>
 
                 <p className="text-xs text-gray-400 text-center mt-3">

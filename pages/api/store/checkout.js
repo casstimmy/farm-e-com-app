@@ -22,13 +22,8 @@ async function handler(req, res) {
 
   try {
     const customerId = req.customer.id;
-    const { shippingAddress, paymentMethod = "Paystack", notes: rawNotes = "" } = req.body;
-
-    // Validate paymentMethod against allowed values (must match Order model enum)
-    const ALLOWED_PAYMENT_METHODS = ["Paystack", "Bank Transfer", "Cash on Delivery"];
-    if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
-      return res.status(400).json({ error: "Invalid payment method" });
-    }
+    const { shippingAddress, notes: rawNotes = "" } = req.body;
+    const paymentMethod = "Paystack";
 
     // Sanitize and limit notes
     const notes = typeof rawNotes === "string" ? rawNotes.trim().slice(0, 500) : "";
@@ -105,61 +100,43 @@ async function handler(req, res) {
       }
     }
 
-    if (paymentMethod === "Paystack") {
-      // Use configured app URL for Paystack callback
-      const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001").replace(/\/$/, "");
-      const callbackUrl = `${appBaseUrl}/payment/verify`;
+    // Initialize Paystack payment
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://farm-e-com-app.vercel.app").replace(/\/$/, "");
+    const callbackUrl = `${appBaseUrl}/payment/verify`;
 
-      try {
-        const payment = await initializePayment({
-          orderId: order._id.toString(),
-          email: req.customer.email,
-          amount: order.total,
-          callbackUrl,
-          metadata: { customerId },
-        });
+    try {
+      const payment = await initializePayment({
+        orderId: order._id.toString(),
+        email: req.customer.email,
+        amount: order.total,
+        callbackUrl,
+        metadata: { customerId },
+      });
 
-        return res.status(201).json({
-          order: {
-            id: order._id,
-            orderNumber: order.orderNumber,
-            total: order.total,
-            status: order.status,
-          },
-          payment: {
-            authorizationUrl: payment.authorizationUrl,
-            reference: payment.reference,
-          },
-        });
-      } catch (payErr) {
-        console.error("Paystack initialization failed:", payErr);
-        // Order was created but payment init failed — don't lose the order.
-        // Return order info so the customer can retry payment.
-        return res.status(201).json({
-          order: {
-            id: order._id,
-            orderNumber: order.orderNumber,
-            total: order.total,
-            status: order.status,
-          },
-          paymentError: "Payment gateway is temporarily unavailable. Your order has been placed — you can complete payment from your orders page.",
-        });
-      }
+      return res.status(201).json({
+        order: {
+          id: order._id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          status: order.status,
+        },
+        payment: {
+          authorizationUrl: payment.authorizationUrl,
+          reference: payment.reference,
+        },
+      });
+    } catch (payErr) {
+      console.error("Paystack initialization failed:", payErr);
+      return res.status(201).json({
+        order: {
+          id: order._id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          status: order.status,
+        },
+        paymentError: "Payment gateway is temporarily unavailable. Your order has been placed — you can complete payment from your orders page.",
+      });
     }
-
-    res.status(201).json({
-      order: {
-        id: order._id,
-        orderNumber: order.orderNumber,
-        total: order.total,
-        status: order.status,
-        paymentMethod,
-      },
-      message:
-        paymentMethod === "Bank Transfer"
-          ? "Please complete the bank transfer. Your order will be processed once payment is confirmed."
-          : "Your order has been placed. Payment will be collected on delivery.",
-    });
   } catch (error) {
     console.error("Checkout error:", error);
     res.status(500).json({ error: "Checkout failed. Please try again." });

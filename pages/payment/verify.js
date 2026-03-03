@@ -26,7 +26,7 @@ export default function PaymentVerifyPage() {
         );
         setOrder(data.order);
         setStatus("success");
-        // Refresh cart since it was cleared on order creation
+        // Refresh cart since it was cleared after payment confirmation
         fetchCart();
       } catch (err) {
         setError(
@@ -38,19 +38,6 @@ export default function PaymentVerifyPage() {
 
     verify();
   }, [reference]);
-
-  useEffect(() => {
-    if (status !== "success") return;
-
-    const targetBase = appBaseUrl || (typeof window !== "undefined" ? window.location.origin : "");
-    if (!targetBase) return;
-
-    const timeout = setTimeout(() => {
-      window.location.assign(`${targetBase}/account/orders`);
-    }, 1500);
-
-    return () => clearTimeout(timeout);
-  }, [status, appBaseUrl]);
 
   return (
     <StoreLayout>

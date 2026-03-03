@@ -91,7 +91,7 @@ const OrderSchema = new mongoose.Schema(
     customerPhone: String,
     paymentMethod: {
       type: String,
-      enum: ["Paystack", "Bank Transfer", "Cash on Delivery"],
+      enum: ["Paystack"],
       default: "Paystack",
     },
     paymentStatus: {
