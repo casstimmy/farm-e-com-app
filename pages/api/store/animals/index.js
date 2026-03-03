@@ -97,7 +97,7 @@ async function handler(req, res) {
     const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * perPage;
 
-    const [animals, totalCount] = await Promise.all([
+    const [animals, totalCount, allAnimalsCount, aliveCount, salesPriceCount] = await Promise.all([
       Animal.find(filter)
         .sort(sortOption)
         .skip(skip)
@@ -107,7 +107,19 @@ async function handler(req, res) {
         .lean()
         .exec(),
       Animal.countDocuments(filter),
+      Animal.countDocuments({}),  // Total animals in DB
+      Animal.countDocuments({ status: "Alive" }),  // Alive animals
+      Animal.countDocuments({ projectedSalesPrice: { $gt: 0 } }),  // Animals with sales price
     ]);
+
+    // Debug logging
+    console.log(`[Animals API] Filter applied: ${JSON.stringify(filter)}`);
+    console.log(`[Animals API] Results: ${animals.length} items returned`);
+    console.log(`[Animals API] Filtered count (matching all criteria): ${totalCount}`);
+    console.log(`[Animals API] Database stats - Total: ${allAnimalsCount}, Alive: ${aliveCount}, HasSalesPrice: ${salesPriceCount}`);
+    if (animals.length === 0 && totalCount === 0) {
+      console.warn(`[Animals API] WARNING: No animals match the filter! Check if database is populated.`);
+    }
 
     // Get species counts for category sidebar
     const speciesCounts = await Animal.aggregate([
@@ -174,8 +186,9 @@ async function handler(req, res) {
       },
     });
   } catch (error) {
-    console.error("Animals API error:", error);
-    res.status(500).json({ error: "Failed to fetch animals" });
+    console.error("[Animals API] ERROR:", error.message);
+    console.error("[Animals API] Stack:", error.stack);
+    res.status(500).json({ error: "Failed to fetch animals", details: error.message });
   }
 }
 

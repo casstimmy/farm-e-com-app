@@ -34,7 +34,7 @@ export async function getServerSideProps({ query }) {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * perPage;
-    const [animals, totalCount, speciesCounts] = await Promise.all([
+    const [animals, totalCount, speciesCounts, allAnimalsCount, aliveCount, salesPriceCount] = await Promise.all([
       AnimalModel.find(filter).sort(sortOption).skip(skip).limit(perPage)
         .populate("location", "name city state")
         .select("-purchaseCost -totalFeedCost -totalMedicationCost -marginPercent -sire -dam -recordedBy -isArchived -archivedAt -archivedReason")
@@ -45,7 +45,16 @@ export async function getServerSideProps({ query }) {
         { $group: { _id: "$species", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
+      AnimalModel.countDocuments({}),
+      AnimalModel.countDocuments({ status: "Alive" }),
+      AnimalModel.countDocuments({ projectedSalesPrice: { $gt: 0 } }),
     ]);
+    console.log(`[Animals SSR] Filter: ${JSON.stringify(filter)}`);
+    console.log(`[Animals SSR] Found ${animals.length} items (page ${pageNum}), total matching: ${totalCount}`);
+    console.log(`[Animals SSR] Database stats - Total: ${allAnimalsCount}, Alive: ${aliveCount}, HasSalesPrice: ${salesPriceCount}`);
+    if (totalCount === 0 && allAnimalsCount > 0) {
+      console.warn(`[Animals SSR] WARNING: Database has ${allAnimalsCount} animals but none match criteria (Alive + HasSalesPrice)`);
+    }
     let breedCounts = [];
     if (species) {
       breedCounts = await AnimalModel.aggregate([
