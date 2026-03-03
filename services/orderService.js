@@ -110,14 +110,14 @@ export async function createOrder({
 
   // Send order confirmation email to customer (fire-and-forget)
   const fullCustomer = customer;
-  sendOrderConfirmationEmail(order.toObject(), fullCustomer).catch((err) =>
-    console.error("Failed to send order confirmation email:", err)
-  );
-
-  // Also send notification to business email
-  sendNewOrderNotificationToAdmin(order.toObject(), fullCustomer).catch((err) =>
-    console.error("Failed to send admin order notification:", err)
-  );
+  Promise.all([
+    sendOrderConfirmationEmail(order.toObject(), fullCustomer).catch((err) => {
+      console.error("❌ Failed to send customer confirmation email for order", order.orderNumber, ":", err.message);
+    }),
+    sendNewOrderNotificationToAdmin(order.toObject(), fullCustomer).catch((err) => {
+      console.error("❌ Failed to send admin notification for order", order.orderNumber, ":", err.message);
+    }),
+  ]);
 
   return order;
 }

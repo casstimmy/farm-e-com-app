@@ -54,6 +54,7 @@ export default function StoreLoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      setLoading(false);
       await router.push(redirectTarget);
     } catch (err) {
       const msg = err.response?.data?.error || "Invalid email or password";
@@ -96,9 +97,11 @@ export default function StoreLoginPage() {
     setLoading(true);
     try {
       await resetPassword(email, resetCode, newPassword);
+      setLoading(false);
       await router.push(redirectTarget);
     } catch (err) {
-      setError(err.response?.data?.error || "Reset failed. Check your code and try again.");
+      const msg = err.response?.data?.error || "Reset failed. Check your code and try again.";
+      setError(msg);
       setLoading(false);
     }
   };

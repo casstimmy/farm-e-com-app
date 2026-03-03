@@ -107,6 +107,7 @@ export default function StoreRegisterPage() {
 
     try {
       await verifyEmail(form.email, verificationCode);
+      setLoading(false);
       await router.push(redirectTarget);
     } catch (err) {
       setError(err.response?.data?.error || "Verification failed. Please check the code.");

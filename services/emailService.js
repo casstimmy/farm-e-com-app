@@ -5,13 +5,13 @@ import nodemailer from "nodemailer";
  * Handles all email operations using Nodemailer
  */
 
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_USER = process.env.EMAIL_USER?.trim();
+const EMAIL_PASS = process.env.EMAIL_PASS?.trim();
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Farm Fresh Store";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
 
 if (!EMAIL_USER || !EMAIL_PASS) {
-  console.warn("Email credentials not configured. Email service will not work.");
+  console.warn("⚠️  Email credentials not configured. Email service will not work.");
 }
 
 /**
@@ -32,16 +32,24 @@ let _transporter = null;
 function getTransporter() {
   if (_transporter) return _transporter;
   if (!EMAIL_USER || !EMAIL_PASS) {
-    throw new Error("Email credentials not configured");
+    const msg = "Email credentials not configured in environment variables";
+    console.error("❌", msg);
+    throw new Error(msg);
   }
-  _transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
-  return _transporter;
+  try {
+    _transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
+      },
+    });
+    console.log("✅ Email transporter initialized for", EMAIL_USER);
+    return _transporter;
+  } catch (error) {
+    console.error("❌ Failed to initialize email transporter:", error.message);
+    throw error;
+  }
 }
 
 /**
