@@ -56,6 +56,7 @@ async function handler(req, res) {
     if (error.code === 11000) {
       return res.status(409).json({ error: "An account with this email already exists" });
     }
+    console.error("Registration error:", error);
     return res.status(500).json({ error: "Registration failed. Please try again." });
   }
 }

@@ -17,12 +17,14 @@ import {
   FaConciergeBell,
   FaStore,
   FaArrowRight,
+  FaBlog,
 } from "react-icons/fa";
 
 const navLinks = [
   { href: "/animals", label: "Animals", icon: FaPaw },
   { href: "/shop", label: "Shop", icon: FaStore },
   { href: "/services", label: "Services", icon: FaConciergeBell },
+  { href: "/blog", label: "Blog", icon: FaBlog },
 ];
 
 export default function StoreLayout({ children }) {

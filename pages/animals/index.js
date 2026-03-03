@@ -5,8 +5,6 @@ import { motion } from "framer-motion";
 import StoreLayout from "@/components/store/StoreLayout";
 import AnimalCard from "@/components/store/AnimalCard";
 import { useStore } from "@/context/StoreContext";
-import dbConnect from "@/lib/mongodb";
-import AnimalModel from "@/models/Animal";
 import {
   FaFilter,
   FaTimes,
@@ -18,6 +16,9 @@ import {
 
 export async function getServerSideProps({ query }) {
   try {
+    const { default: dbConnect } = await import("@/lib/mongodb");
+    const { default: AnimalModel } = await import("@/models/Animal");
+    await import("@/models/Location");
     await dbConnect();
     const { species, breed, gender, sort = "newest", search, page = 1, limit = 20 } = query;
     const filter = { status: "Alive", isArchived: { $ne: true }, projectedSalesPrice: { $gt: 0 } };
