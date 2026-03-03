@@ -7,8 +7,10 @@ import nodemailer from "nodemailer";
 
 const EMAIL_USER = process.env.EMAIL_USER?.trim();
 const EMAIL_PASS = process.env.EMAIL_PASS?.trim();
+const BUSINESS_NOTIFICATION_EMAIL = process.env.BUSINESS_NOTIFICATION_EMAIL?.trim();
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Farm Fresh Store";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://farm-e-com-app.vercel.app";
+const ADMIN_APP_URL = process.env.ADMIN_APP_URL || "https://farm-health-app.vercel.app";
 
 if (!EMAIL_USER || !EMAIL_PASS) {
   console.warn("⚠️  Email credentials not configured. Email service will not work.");
@@ -195,7 +197,7 @@ export async function sendOrderConfirmationEmail(order, customer) {
             You can track your order status at any time by visiting your account page.
           </p>
 
-          <a href="${APP_URL}/account/orders" class="cta-button">View My Orders</a>
+          <a href="${APP_URL}/account/orders" class="cta-button">View Account Orders</a>
 
           <p style="margin-top: 30px; font-size: 13px; color: #999;">
             If you have any questions, please contact our support team.<br>
@@ -567,7 +569,7 @@ export async function resendVerificationEmail(customer, code) {
  * Includes order summary so the business knows immediately.
  */
 export async function sendNewOrderNotificationToAdmin(order, customer) {
-  const businessEmail = process.env.BUSINESS_NOTIFICATION_EMAIL || EMAIL_USER;
+  const businessEmail = BUSINESS_NOTIFICATION_EMAIL || EMAIL_USER;
   if (!businessEmail) return false;
 
   const { orderNumber, total, items, paymentMethod, shippingAddress, createdAt } = order;
@@ -628,7 +630,7 @@ export async function sendNewOrderNotificationToAdmin(order, customer) {
           </table>
 
           <div style="text-align: center; margin-top: 20px;">
-            <a href="${APP_URL}/admin/orders" style="display: inline-block; background: #16a34a; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">View in Admin Dashboard</a>
+            <a href="${ADMIN_APP_URL}/manage/orders" style="display: inline-block; background: #16a34a; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">View in Admin Dashboard</a>
           </div>
         </div>
       </div>

@@ -61,6 +61,9 @@ export default async function handler(req, res) {
       console.error("❌ Customer email failed:", err.message);
       throw err;
     });
+    if (!customerEmailResult) {
+      throw new Error("Customer email was not sent (email service returned false)");
+    }
     console.log("✅ Customer email sent successfully");
 
     // Test admin notification
@@ -69,6 +72,9 @@ export default async function handler(req, res) {
       console.error("❌ Admin email failed:", err.message);
       throw err;
     });
+    if (!adminEmailResult) {
+      throw new Error("Admin email was not sent (email service returned false)");
+    }
     console.log("✅ Admin email sent successfully");
 
     return res.status(200).json({

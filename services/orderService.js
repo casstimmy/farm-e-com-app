@@ -108,16 +108,26 @@ export async function createOrder({
     await Cart.deleteOne({ customer: customerId });
   }
 
-  // Send order confirmation email to customer (fire-and-forget)
+  // Send order confirmation email to customer + business notification email.
+  // We await both attempts to avoid dropped sends in serverless environments,
+  // but never fail order creation because of email delivery issues.
   const fullCustomer = customer;
-  Promise.all([
-    sendOrderConfirmationEmail(order.toObject(), fullCustomer).catch((err) => {
-      console.error("❌ Failed to send customer confirmation email for order", order.orderNumber, ":", err.message);
-    }),
-    sendNewOrderNotificationToAdmin(order.toObject(), fullCustomer).catch((err) => {
-      console.error("❌ Failed to send admin notification for order", order.orderNumber, ":", err.message);
-    }),
+  const [customerEmailResult, adminEmailResult] = await Promise.allSettled([
+    sendOrderConfirmationEmail(order.toObject(), fullCustomer),
+    sendNewOrderNotificationToAdmin(order.toObject(), fullCustomer),
   ]);
+
+  if (customerEmailResult.status === "rejected") {
+    console.error("❌ Failed to send customer confirmation email for order", order.orderNumber, ":", customerEmailResult.reason?.message || customerEmailResult.reason);
+  } else if (!customerEmailResult.value) {
+    console.error("❌ Customer confirmation email returned false for order", order.orderNumber);
+  }
+
+  if (adminEmailResult.status === "rejected") {
+    console.error("❌ Failed to send admin notification for order", order.orderNumber, ":", adminEmailResult.reason?.message || adminEmailResult.reason);
+  } else if (!adminEmailResult.value) {
+    console.error("❌ Admin notification email returned false for order", order.orderNumber);
+  }
 
   return order;
 }
