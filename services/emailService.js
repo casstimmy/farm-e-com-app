@@ -554,4 +554,93 @@ export async function resendVerificationEmail(customer, code) {
   return sendVerificationEmail(customer, code);
 }
 
+/**
+ * Send new order notification email to the business admin.
+ * Includes order summary so the business knows immediately.
+ */
+export async function sendNewOrderNotificationToAdmin(order, customer) {
+  const businessEmail = process.env.BUSINESS_NOTIFICATION_EMAIL || EMAIL_USER;
+  if (!businessEmail) return false;
+
+  const { orderNumber, total, items, paymentMethod, shippingAddress, createdAt } = order;
+  const safeOrderNumber = escapeHtml(orderNumber);
+  const safeCustomerName = escapeHtml(`${customer.firstName} ${customer.lastName}`);
+  const safeEmail = escapeHtml(customer.email);
+  const safePhone = escapeHtml(customer.phone || "Not provided");
+  const safeStreet = escapeHtml(shippingAddress?.street);
+  const safeCity = escapeHtml(shippingAddress?.city);
+  const safeState = escapeHtml(shippingAddress?.state);
+
+  const itemRows = items
+    .map(
+      (item) =>
+        `<tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">${escapeHtml(item.name)}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">₦${(item.lineTotal || 0).toLocaleString()}</td>
+        </tr>`
+    )
+    .join("");
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
+      <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: #16a34a; color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 22px;">🛒 New Order Received</h1>
+          <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Order #${safeOrderNumber}</p>
+        </div>
+        <div style="background: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px;">
+          <div style="background: white; padding: 16px; border-radius: 6px; margin-bottom: 16px; border-left: 4px solid #16a34a;">
+            <h3 style="margin: 0 0 8px 0; color: #16a34a;">Order Summary</h3>
+            <p style="margin: 4px 0; font-size: 14px;"><strong>Date:</strong> ${new Date(createdAt).toLocaleString("en-NG")}</p>
+            <p style="margin: 4px 0; font-size: 14px;"><strong>Payment:</strong> ${escapeHtml(paymentMethod)}</p>
+            <p style="margin: 4px 0; font-size: 14px;"><strong>Total:</strong> <span style="font-size: 18px; color: #16a34a; font-weight: bold;">₦${(total || 0).toLocaleString()}</span></p>
+          </div>
+
+          <div style="background: white; padding: 16px; border-radius: 6px; margin-bottom: 16px;">
+            <h4 style="margin: 0 0 8px 0;">Customer</h4>
+            <p style="margin: 4px 0; font-size: 14px;">${safeCustomerName}</p>
+            <p style="margin: 4px 0; font-size: 14px;">📧 ${safeEmail}</p>
+            <p style="margin: 4px 0; font-size: 14px;">📞 ${safePhone}</p>
+            <p style="margin: 4px 0; font-size: 14px;">📍 ${safeStreet}, ${safeCity}, ${safeState}</p>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden;">
+            <thead>
+              <tr style="background: #f0f0f0;">
+                <th style="padding: 8px 12px; text-align: left; font-size: 13px;">Item</th>
+                <th style="padding: 8px 12px; text-align: center; font-size: 13px;">Qty</th>
+                <th style="padding: 8px 12px; text-align: right; font-size: 13px;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+
+          <div style="text-align: center; margin-top: 20px;">
+            <a href="${APP_URL}/admin/orders" style="display: inline-block; background: #16a34a; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">View in Admin Dashboard</a>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await getTransporter().sendMail({
+      from: `"${APP_NAME}" <${EMAIL_USER}>`,
+      to: businessEmail,
+      subject: `New Order #${orderNumber} - ₦${(total || 0).toLocaleString()} from ${customer.firstName} ${customer.lastName}`,
+      html,
+    });
+    console.log(`Admin order notification sent to ${businessEmail}`);
+    return true;
+  } catch (error) {
+    console.error("Failed to send admin order notification:", error);
+    return false;
+  }
+}
+
 export default { getTransporter, verifyEmailConnection };

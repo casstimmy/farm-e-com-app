@@ -103,7 +103,7 @@ export default function OrderConfirmationPage() {
                 View My Orders
               </Link>
               <Link
-                href="/shop"
+                href="/"
                 className="inline-flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-6 rounded-lg transition-all"
               >
                 <FaShoppingCart className="w-4 h-4" />
@@ -281,14 +281,14 @@ export default function OrderConfirmationPage() {
 
                 <div className="grid grid-cols-1 gap-3">
                   <Link
-                    href="/account/orders"
+                    href="/"
                     className="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all"
                   >
                     <FaReceipt className="w-4 h-4" />
                     View My Orders
                   </Link>
                   <Link
-                    href="/shop"
+                    href="/"
                     className="inline-flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 rounded-lg transition-all"
                   >
                     <FaShoppingCart className="w-4 h-4" />

@@ -24,7 +24,19 @@ async function getOrCreateProductForInventory(inventoryId) {
   // Check if a Product already exists for this inventory item
   let product = await Product.findOne({ inventoryItem: inventoryId });
   if (product) {
-    if (!product.isActive) {
+    // Sync stock inline to avoid second Inventory.findById in caller
+    const inv = await Inventory.findById(inventoryId)
+      .select("quantity salesPrice costPrice")
+      .lean();
+    if (inv) {
+      const newPrice = inv.salesPrice || inv.costPrice || product.price;
+      if (product.stockQuantity !== inv.quantity || product.price !== newPrice || !product.isActive) {
+        product.stockQuantity = inv.quantity;
+        product.price = newPrice;
+        product.isActive = true;
+        await product.save();
+      }
+    } else if (!product.isActive) {
       product.isActive = true;
       await product.save();
     }
@@ -83,7 +95,9 @@ async function getOrCreateProductForService(serviceId) {
     return product;
   }
 
-  const service = await Service.findById(serviceId);
+  const service = await Service.findById(serviceId)
+    .select("name description price unit showOnSite isActive")
+    .lean();
   if (!service || !service.showOnSite || !service.isActive) return null;
 
   const baseSlug = (service.name || "service")
@@ -134,7 +148,9 @@ async function getOrCreateProductForAnimal(animalId) {
     return product;
   }
 
-  const animal = await Animal.findById(animalId);
+  const animal = await Animal.findById(animalId)
+    .select("name species tagId status isArchived projectedSalesPrice notes images")
+    .lean();
   if (
     !animal ||
     animal.status !== "Alive" ||
@@ -294,19 +310,14 @@ async function handler(req, res) {
         }
       } else if (inventoryId) {
         // Auto-find or create a Product for this inventory item
+        // Stock is already synced inside getOrCreateProductForInventory
         product = await getOrCreateProductForInventory(inventoryId);
         if (!product) {
           return res.status(404).json({ error: "Product not available" });
         }
-        // Sync stock from inventory
-        const inv = await Inventory.findById(inventoryId);
-        if (inv) {
-          product.stockQuantity = inv.quantity;
-          product.price = inv.salesPrice || inv.costPrice || product.price;
-          await product.save();
-        }
       } else {
-        product = await Product.findById(productId);
+        product = await Product.findById(productId)
+          .select("name slug price costPrice images stockQuantity isActive trackInventory unit");
         if (!product || !product.isActive) {
           return res.status(404).json({ error: "Product not available" });
         }

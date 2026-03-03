@@ -11,6 +11,7 @@ import {
   sendOrderConfirmationEmail,
   sendShipmentNotificationEmail,
   sendDeliveryConfirmationEmail,
+  sendNewOrderNotificationToAdmin,
 } from "./emailService";
 
 /**
@@ -101,8 +102,22 @@ export async function createOrder({
 
   await order.save();
 
-  // Clear customer cart
-  await Cart.deleteOne({ customer: customerId });
+  // For Paystack, keep the cart until payment is confirmed.
+  // For other methods (Bank Transfer, Cash on Delivery), clear immediately.
+  if (paymentMethod !== "Paystack") {
+    await Cart.deleteOne({ customer: customerId });
+  }
+
+  // Send order confirmation email to customer (fire-and-forget)
+  const fullCustomer = customer;
+  sendOrderConfirmationEmail(order.toObject(), fullCustomer).catch((err) =>
+    console.error("Failed to send order confirmation email:", err)
+  );
+
+  // Also send notification to business email
+  sendNewOrderNotificationToAdmin(order.toObject(), fullCustomer).catch((err) =>
+    console.error("Failed to send admin order notification:", err)
+  );
 
   return order;
 }
@@ -119,6 +134,9 @@ export async function confirmOrderPayment(orderId) {
   order.paymentStatus = "Paid";
   order.paidAt = new Date();
   await order.save();
+
+  // Clear the customer's cart now that payment is confirmed
+  await Cart.deleteOne({ customer: order.customer._id || order.customer });
 
   // Deduct inventory via farm-health-app REST API
   const { errors } = await deductInventoryForOrder(orderId);
@@ -146,13 +164,7 @@ export async function confirmOrderPayment(orderId) {
     await Product.bulkWrite(bulkOps);
   }
 
-  // Send order confirmation email
-  try {
-    await sendOrderConfirmationEmail(order.toObject(), order.customer);
-  } catch (emailError) {
-    console.error("Failed to send order confirmation email:", emailError);
-    // Don't fail the entire process if email fails
-  }
+  // Order confirmation email was already sent at order creation time.
 
   return order;
 }

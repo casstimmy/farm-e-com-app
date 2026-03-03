@@ -115,9 +115,14 @@ export default function CheckoutPage() {
       );
 
       if (paymentMethod === "Paystack" && data.payment?.authorizationUrl) {
-        await fetchCart();
         // Redirect to Paystack checkout
         window.location.href = data.payment.authorizationUrl;
+      } else if (data.paymentError) {
+        // Paystack init failed but order was created
+        await fetchCart();
+        router.push(
+          `/order-confirmation?order=${data.order.orderNumber}`
+        );
       } else {
         await fetchCart();
         // Order placed — redirect to confirmation
